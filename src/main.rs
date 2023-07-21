@@ -3,19 +3,22 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use eyre::{eyre, Result};
+use eyre::Result;
 use ratatui::{
     backend::CrosstermBackend,
     prelude::Backend,
+    style::{Color, Style},
     text::Text,
-    widgets::{Block, Borders, List, ListItem},
+    widgets::{List, ListItem},
     Frame, Terminal,
 };
 use std::{
     fs::{self, ReadDir},
-    io, thread,
+    io,
     time::Duration,
 };
+
+mod settings;
 
 fn make_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;
@@ -47,8 +50,13 @@ impl App {
         let size = f.size();
         let mut items = vec![];
         for file in files {
-            let text = Text::from(file.unwrap().file_name().into_string().unwrap());
-            let item = ListItem::new(text);
+            let text = file.unwrap().file_name().into_string().unwrap();
+            let color = if text == ".git" {
+                Color::Gray
+            } else {
+                Color::Reset
+            };
+            let item = ListItem::new(text).style(Style::new().bg(color));
             items.push(item);
         }
         let list = List::new(items);
