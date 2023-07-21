@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -39,26 +39,51 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
     Ok(())
 }
 
-struct App {}
+struct App {
+    selected: usize,
+    max: usize,
+}
 
 impl App {
-    pub async fn handle_input(&self, e: Event) -> Result<bool> {
-        Ok(matches!(e, event::Event::Key(k) if k.code == KeyCode::Char('q')))
+    pub async fn handle_input(&mut self, e: Event) -> Result<bool> {
+        Ok(if let event::Event::Key(k) = e {
+            if k.kind == KeyEventKind::Release {
+                return Ok(false);
+            }
+            match k.code {
+                KeyCode::Char('q') => true,
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.selected = self.selected.checked_sub(1).unwrap_or_default();
+                    false
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.selected += 1;
+                    self.selected = self.selected.clamp(0, self.max);
+                    false
+                }
+                _ => false,
+            }
+        } else {
+            false
+        })
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, files: ReadDir) {
         let size = f.size();
         let mut items = vec![];
+        let mut pos = 0;
         for file in files {
             let text = file.unwrap().file_name().into_string().unwrap();
-            let color = if text == ".git" {
+            let color = if pos == self.selected {
                 Color::Gray
             } else {
                 Color::Reset
             };
             let item = ListItem::new(text).style(Style::new().bg(color));
             items.push(item);
+            pos += 1;
         }
+        self.max = pos - 1;
         let list = List::new(items);
         f.render_widget(list, size);
     }
@@ -67,7 +92,10 @@ impl App {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut terminal = make_terminal()?;
-    let mut app = App {};
+    let mut app = App {
+        selected: 0,
+        max: 0,
+    };
 
     loop {
         let files = fs::read_dir("./")?;
