@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -30,6 +30,10 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
     Ok(())
 }
 
+async fn handle_input(e: Event) -> Result<bool> {
+    Ok(matches!(e, event::Event::Key(k) if k.code == KeyCode::Char('q')))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut terminal = make_terminal()?;
@@ -39,13 +43,13 @@ async fn main() -> Result<()> {
         f.render_widget(block, size);
     })?;
 
-    // Start a thread to discard any input events. Without handling events, the
-    // stdin buffer will fill up, and be read into the shell when the program exits.
-    thread::spawn(|| loop {
-        let _ = event::read();
-    });
+    loop {
+        let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
 
-    thread::sleep(Duration::from_millis(5000));
+        if event_ready.await?? && handle_input(event::read()?).await? {
+            break;
+        }
+    }
 
     // restore terminal
     restore_terminal(terminal)
