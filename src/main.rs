@@ -37,13 +37,13 @@ async fn handle_input(e: Event) -> Result<bool> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut terminal = make_terminal()?;
-    terminal.draw(|f| {
-        let size = f.size();
-        let block = Block::default().title("Block").borders(Borders::ALL);
-        f.render_widget(block, size);
-    })?;
 
     loop {
+        terminal.draw(|f| {
+            let size = f.size();
+            let block = Block::default().title("Block").borders(Borders::ALL);
+            f.render_widget(block, size);
+        })?;
         let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
 
         if event_ready.await?? && handle_input(event::read()?).await? {
