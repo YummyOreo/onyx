@@ -3,18 +3,18 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use eyre::Result;
+use eyre::{eyre, Result};
 use ratatui::{
     backend::CrosstermBackend,
     prelude::Backend,
     style::{Color, Style},
-    text::Text,
     widgets::{List, ListItem},
     Frame, Terminal,
 };
 use std::{
     fs::{self, ReadDir},
     io,
+    path::PathBuf,
     time::Duration,
 };
 
@@ -40,6 +40,8 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
 }
 
 struct App {
+    files: ReadDir,
+    path: PathBuf,
     selected: usize,
     max: usize,
 }
@@ -68,12 +70,15 @@ impl App {
         })
     }
 
-    pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, files: ReadDir) {
+    pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>) -> Result<()> {
         let size = f.size();
         let mut items = vec![];
         let mut pos = 0;
-        for file in files {
-            let text = file.unwrap().file_name().into_string().unwrap();
+        for file in &mut self.files {
+            let text = file?
+                .file_name()
+                .into_string()
+                .map_err(|s| eyre!("Could not convert filename {:?} to string", s))?;
             let color = if pos == self.selected {
                 Color::Gray
             } else {
@@ -86,6 +91,7 @@ impl App {
         self.max = pos - 1;
         let list = List::new(items);
         f.render_widget(list, size);
+        Ok(())
     }
 }
 
@@ -93,13 +99,15 @@ impl App {
 async fn main() -> Result<()> {
     let mut terminal = make_terminal()?;
     let mut app = App {
+        files: fs::read_dir("./")?,
+        path: PathBuf::from("./"),
         selected: 0,
         max: 0,
     };
 
     loop {
-        let files = fs::read_dir("./")?;
-        terminal.draw(|f| app.draw(f, files))?;
+        app.files = fs::read_dir(&app.path)?;
+        terminal.draw(|f| app.draw(f).unwrap())?;
 
         let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
         if event_ready.await?? && app.handle_input(event::read()?).await? {
