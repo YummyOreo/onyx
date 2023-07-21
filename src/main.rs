@@ -6,8 +6,9 @@ use crossterm::{
 use eyre::{eyre, Result};
 use ratatui::{
     backend::CrosstermBackend,
+    prelude::Backend,
     widgets::{Block, Borders},
-    Terminal,
+    Frame, Terminal,
 };
 use std::{io, thread, time::Duration};
 
@@ -30,23 +31,30 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
     Ok(())
 }
 
-async fn handle_input(e: Event) -> Result<bool> {
-    Ok(matches!(e, event::Event::Key(k) if k.code == KeyCode::Char('q')))
+struct App {}
+
+impl App {
+    pub async fn handle_input(&self, e: Event) -> Result<bool> {
+        Ok(matches!(e, event::Event::Key(k) if k.code == KeyCode::Char('q')))
+    }
+
+    pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>) {
+        let size = f.size();
+        let block = Block::default().title("Block").borders(Borders::ALL);
+        f.render_widget(block, size);
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut terminal = make_terminal()?;
+    let mut app = App {};
 
     loop {
-        terminal.draw(|f| {
-            let size = f.size();
-            let block = Block::default().title("Block").borders(Borders::ALL);
-            f.render_widget(block, size);
-        })?;
-        let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
+        terminal.draw(|f| app.draw(f))?;
 
-        if event_ready.await?? && handle_input(event::read()?).await? {
+        let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
+        if event_ready.await?? && app.handle_input(event::read()?).await? {
             break;
         }
     }
