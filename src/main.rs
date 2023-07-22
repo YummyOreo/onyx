@@ -6,9 +6,9 @@ use crossterm::{
 use eyre::{eyre, Result};
 use ratatui::{
     backend::CrosstermBackend,
-    prelude::Backend,
+    prelude::{Backend, Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{List, ListItem},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
 use std::{
@@ -71,7 +71,6 @@ impl App {
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>) -> Result<()> {
-        let size = f.size();
         let mut items = vec![];
         let mut pos = 0;
         for file in &mut self.files {
@@ -89,8 +88,18 @@ impl App {
             pos += 1;
         }
         self.max = pos - 1;
-        let list = List::new(items);
-        f.render_widget(list, size);
+
+        let listblock = Block::default().title("Fs").borders(Borders::ALL);
+        let list = List::new(items).block(listblock);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
+            .split(f.size());
+        f.render_widget(list, chunks[0]);
+        let pblock = Block::default().title("Info").borders(Borders::ALL);
+        let p = Paragraph::new("").block(pblock);
+        f.render_widget(p, chunks[1]);
         Ok(())
     }
 }
