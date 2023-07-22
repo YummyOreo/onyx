@@ -12,7 +12,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use std::{
-    fs::{self, ReadDir},
+    fs::{self, DirEntry, ReadDir},
     io,
     path::PathBuf,
     time::Duration,
@@ -59,7 +59,7 @@ enum InputResult {
 }
 
 struct App {
-    files: ReadDir,
+    files: Vec<DirEntry>,
     path: PathBuf,
     selected: usize,
     max: usize,
@@ -83,17 +83,14 @@ impl App {
                     self.selected += 1;
                     self.selected = self.selected.clamp(0, self.max);
                 }
-                KeyCode::Char('c') => {
-                    self.mode = Mode::CreateFile(String::new());
-                }
+                KeyCode::Char('c') => self.mode = Mode::CreateFile(String::new()),
                 KeyCode::Char('r') => {
-                    self.mode =
-                        Mode::RenameFile(self.files.nth(self.selected).unwrap().unwrap().path());
+                    self.mode = Mode::RenameFile(self.files.get(self.selected).unwrap().path())
                 }
                 KeyCode::Char('d') => {
-                    self.mode =
-                        Mode::DeleteFile(self.files.nth(self.selected).unwrap().unwrap().path());
+                    self.mode = Mode::DeleteFile(self.files.get(self.selected).unwrap().path())
                 }
+                KeyCode::Esc => self.mode = Mode::Basic,
                 _ => (),
             }
         }
@@ -104,7 +101,7 @@ impl App {
         let mut items = vec![];
         let mut pos = 0;
         for file in &mut self.files {
-            let text = file?
+            let text = file
                 .file_name()
                 .into_string()
                 .map_err(|s| eyre!("Could not convert filename {:?} to string", s))?;
@@ -129,7 +126,12 @@ impl App {
         f.render_widget(list, chunks[0]);
 
         // MODE STUFF
-        let title = "";
+        let title = match &self.mode {
+            Mode::Basic => "",
+            Mode::CreateFile(_) => "Create File",
+            Mode::RenameFile(_) => "Renaming file",
+            Mode::DeleteFile(_) => "Deleting file",
+        };
         let pblock = Block::default().title(title).borders(Borders::ALL);
         let p = Paragraph::new("").block(pblock);
         f.render_widget(p, chunks[1]);
@@ -141,7 +143,7 @@ impl App {
 async fn main() -> Result<()> {
     let mut terminal = make_terminal()?;
     let mut app = App {
-        files: fs::read_dir("./")?,
+        files: fs::read_dir("./")?.map(|f| f.unwrap()).collect(),
         path: PathBuf::from("./"),
         selected: 0,
         max: 0,
@@ -149,7 +151,7 @@ async fn main() -> Result<()> {
     };
 
     loop {
-        app.files = fs::read_dir(&app.path)?;
+        app.files = fs::read_dir(&app.path)?.map(|f| f.unwrap()).collect();
         terminal.draw(|f| app.draw(f).unwrap())?;
 
         let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
