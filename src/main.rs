@@ -39,11 +39,25 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
     Ok(())
 }
 
+pub enum Mode {
+    Basic,
+    CreateFile(String),
+    RenameFile(PathBuf),
+    DeleteFile(PathBuf),
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Self::Basic
+    }
+}
+
 struct App {
     files: ReadDir,
     path: PathBuf,
     selected: usize,
     max: usize,
+    mode: Mode,
 }
 
 impl App {
@@ -61,6 +75,20 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.selected += 1;
                     self.selected = self.selected.clamp(0, self.max);
+                    false
+                }
+                KeyCode::Char('c') => {
+                    self.mode = Mode::CreateFile(String::new());
+                    false
+                }
+                KeyCode::Char('r') => {
+                    self.mode =
+                        Mode::RenameFile(self.files.nth(self.selected).unwrap().unwrap().path());
+                    false
+                }
+                KeyCode::Char('d') => {
+                    self.mode =
+                        Mode::DeleteFile(self.files.nth(self.selected).unwrap().unwrap().path());
                     false
                 }
                 _ => false,
@@ -97,7 +125,10 @@ impl App {
             .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
             .split(f.size());
         f.render_widget(list, chunks[0]);
-        let pblock = Block::default().title("Info").borders(Borders::ALL);
+
+        // MODE STUFF
+        let title = "";
+        let pblock = Block::default().title(title).borders(Borders::ALL);
         let p = Paragraph::new("").block(pblock);
         f.render_widget(p, chunks[1]);
         Ok(())
@@ -112,6 +143,7 @@ async fn main() -> Result<()> {
         path: PathBuf::from("./"),
         selected: 0,
         max: 0,
+        mode: Mode::default(),
     };
 
     loop {
