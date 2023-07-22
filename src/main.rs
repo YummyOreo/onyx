@@ -52,6 +52,12 @@ impl Default for Mode {
     }
 }
 
+#[derive(PartialEq, Eq)]
+enum InputResult {
+    Quit,
+    None,
+}
+
 struct App {
     files: ReadDir,
     path: PathBuf,
@@ -61,41 +67,37 @@ struct App {
 }
 
 impl App {
-    pub async fn handle_input(&mut self, e: Event) -> Result<bool> {
-        Ok(if let event::Event::Key(k) = e {
+    pub async fn handle_input(&mut self, e: Event) -> InputResult {
+        if let event::Event::Key(k) = e {
             if k.kind == KeyEventKind::Release {
-                return Ok(false);
+                return InputResult::None;
             }
             match k.code {
-                KeyCode::Char('q') => true,
+                KeyCode::Char('q') => {
+                    return InputResult::Quit;
+                }
                 KeyCode::Up | KeyCode::Char('k') => {
                     self.selected = self.selected.checked_sub(1).unwrap_or_default();
-                    false
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.selected += 1;
                     self.selected = self.selected.clamp(0, self.max);
-                    false
                 }
                 KeyCode::Char('c') => {
                     self.mode = Mode::CreateFile(String::new());
-                    false
                 }
                 KeyCode::Char('r') => {
                     self.mode =
                         Mode::RenameFile(self.files.nth(self.selected).unwrap().unwrap().path());
-                    false
                 }
                 KeyCode::Char('d') => {
                     self.mode =
                         Mode::DeleteFile(self.files.nth(self.selected).unwrap().unwrap().path());
-                    false
                 }
-                _ => false,
+                _ => (),
             }
-        } else {
-            false
-        })
+        }
+        InputResult::None
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>) -> Result<()> {
@@ -151,7 +153,7 @@ async fn main() -> Result<()> {
         terminal.draw(|f| app.draw(f).unwrap())?;
 
         let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
-        if event_ready.await?? && app.handle_input(event::read()?).await? {
+        if event_ready.await?? && app.handle_input(event::read()?).await == InputResult::Quit {
             break;
         }
     }
