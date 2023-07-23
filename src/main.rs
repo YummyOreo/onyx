@@ -1,5 +1,7 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -39,11 +41,12 @@ fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Res
     Ok(())
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Mode {
     Basic,
     CreateFile(String),
-    RenameFile(PathBuf),
-    DeleteFile(PathBuf),
+    RenameFile(PathBuf, String),
+    DeleteFile(PathBuf, String),
 }
 
 impl Default for Mode {
@@ -52,9 +55,33 @@ impl Default for Mode {
     }
 }
 
+impl Mode {
+    pub fn add_char(&mut self, c: char) {
+        match self {
+            Self::CreateFile(s) | Self::RenameFile(_, s) | Mode::DeleteFile(_, s) => s.push(c),
+            _ => {}
+        }
+    }
+    pub fn remove_char(&mut self) {
+        match self {
+            Self::CreateFile(s) | Self::RenameFile(_, s) | Mode::DeleteFile(_, s) => {
+                s.pop();
+            }
+            _ => {}
+        }
+    }
+    pub fn get_str(&self) -> Option<&str> {
+        match self {
+            Self::CreateFile(s) | Self::RenameFile(_, s) | Mode::DeleteFile(_, s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq)]
 enum InputResult {
     Quit,
+    Enter,
     None,
 }
 
@@ -72,6 +99,9 @@ impl App {
             if k.kind == KeyEventKind::Release {
                 return InputResult::None;
             }
+            if self.mode != Mode::Basic {
+                return self.handle_input_mode(k).await;
+            }
             match k.code {
                 KeyCode::Char('q') => {
                     return InputResult::Quit;
@@ -85,14 +115,44 @@ impl App {
                 }
                 KeyCode::Char('c') => self.mode = Mode::CreateFile(String::new()),
                 KeyCode::Char('r') => {
-                    self.mode = Mode::RenameFile(self.files.get(self.selected).unwrap().path())
+                    self.mode = Mode::RenameFile(
+                        self.files.get(self.selected).unwrap().path(),
+                        String::new(),
+                    )
                 }
                 KeyCode::Char('d') => {
-                    self.mode = Mode::DeleteFile(self.files.get(self.selected).unwrap().path())
+                    self.mode = Mode::DeleteFile(
+                        self.files.get(self.selected).unwrap().path(),
+                        String::new(),
+                    )
                 }
                 KeyCode::Esc => self.mode = Mode::Basic,
                 _ => (),
             }
+        }
+        InputResult::None
+    }
+
+    pub async fn handle_input_mode(&mut self, k: KeyEvent) -> InputResult {
+        match k.code {
+            KeyCode::Char(c) => match self.mode {
+                Mode::CreateFile(_) | Mode::RenameFile(_, _) | Mode::DeleteFile(_, _) => {
+                    self.mode.add_char(c)
+                }
+                _ => {}
+            },
+            KeyCode::Enter => {
+                return InputResult::Enter;
+            }
+            KeyCode::Esc => self.mode = Mode::Basic,
+            KeyCode::Up => {
+                self.selected = self.selected.checked_sub(1).unwrap_or_default();
+            }
+            KeyCode::Down => {
+                self.selected += 1;
+                self.selected = self.selected.clamp(0, self.max);
+            }
+            _ => {}
         }
         InputResult::None
     }
@@ -129,11 +189,11 @@ impl App {
         let title = match &self.mode {
             Mode::Basic => "",
             Mode::CreateFile(_) => "Create File",
-            Mode::RenameFile(_) => "Renaming file",
-            Mode::DeleteFile(_) => "Deleting file",
+            Mode::RenameFile(_, _) => "Renaming file",
+            Mode::DeleteFile(_, _) => "Deleting file",
         };
         let pblock = Block::default().title(title).borders(Borders::ALL);
-        let p = Paragraph::new("").block(pblock);
+        let p = Paragraph::new(self.mode.get_str().unwrap_or("")).block(pblock);
         f.render_widget(p, chunks[1]);
         Ok(())
     }
@@ -155,8 +215,30 @@ async fn main() -> Result<()> {
         terminal.draw(|f| app.draw(f).unwrap())?;
 
         let event_ready = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
-        if event_ready.await?? && app.handle_input(event::read()?).await == InputResult::Quit {
-            break;
+
+        if event_ready.await?? {
+            match app.handle_input(event::read()?).await {
+                InputResult::Quit => {
+                    break;
+                }
+                InputResult::Enter => match &app.mode {
+                    Mode::CreateFile(file) => {
+                        let path = app.path.join(file);
+                        fs::create_dir_all(path)?;
+                    }
+                    Mode::RenameFile(f, n) => {
+                        // dbg!(app.path.join(f));
+                        fs::rename(app.path.join(f), n)?;
+                    }
+                    Mode::DeleteFile(f, i) => {
+                        if i.to_lowercase() == 'y'.to_string() {
+                            fs::remove_file(app.path.join(f))?;
+                        }
+                    }
+                    _ => {}
+                },
+                InputResult::None => {}
+            }
         }
     }
 
