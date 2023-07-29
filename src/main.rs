@@ -14,32 +14,14 @@ use ratatui::{
     Frame, Terminal,
 };
 use std::{
-    fs::{self, DirEntry, ReadDir},
+    fs::{self, DirEntry},
     io,
     path::PathBuf,
     time::Duration,
 };
 
 mod settings;
-
-fn make_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    Ok(Terminal::new(backend)?)
-}
-
-fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-    Ok(())
-}
+mod ui;
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
@@ -201,7 +183,7 @@ impl App {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut terminal = make_terminal()?;
+    let mut terminal = ui::make_terminal()?;
     let mut app = App {
         files: fs::read_dir("./")?.map(|f| f.unwrap()).collect(),
         path: PathBuf::from("./"),
@@ -243,5 +225,5 @@ async fn main() -> Result<()> {
     }
 
     // restore terminal
-    restore_terminal(terminal)
+    ui::restore_terminal(terminal)
 }
