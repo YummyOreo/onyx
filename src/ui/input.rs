@@ -2,11 +2,14 @@ use std::path::PathBuf;
 
 use crossterm::event::{Event, KeyCode};
 
-use crate::Mode;
+use crate::app::Mode;
 
 pub fn match_keycode(mode: &Mode, current_file: PathBuf, input: KeyCode) -> InputResult {
     match input {
         KeyCode::Char(c) if mode != &Mode::Basic => InputResult::Mode(InputModeResult::AddChar(c)),
+        KeyCode::Backspace if mode != &Mode::Basic => {
+            InputResult::Mode(InputModeResult::RemoveChar)
+        }
         KeyCode::Enter if mode != &Mode::Basic => InputResult::Mode(InputModeResult::Execute),
         KeyCode::Esc if mode != &Mode::Basic => {
             InputResult::Mode(InputModeResult::ModeChange(Mode::Basic))
