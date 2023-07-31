@@ -77,6 +77,7 @@ impl App {
         loop {
             self.files = fs::read_dir(&self.path)?.map(|f| f.unwrap()).collect();
             self.ui.max = self.files.len() - 1;
+            self.ui.selected = self.ui.selected.clamp(0, self.ui.max);
             terminal.draw(|f| self.ui.draw(f, &self.files))?;
 
             let event_ready =
@@ -108,12 +109,28 @@ impl App {
                         self.ui.mode.remove_char();
                     }
                     InputResult::Mode(InputModeResult::Execute) => {
-                        match &self.ui.mode {
-                            Mode::CreateFile(file) => filesystem::modify::create_file(file).await?,
-                            Mode::RenameFile(from, new) => filesystem::modify::rename_file(from, new).await?,
+                        let mut mode = Mode::Basic;
+                        core::mem::swap(&mut self.ui.mode, &mut mode);
+                        match mode {
+                            Mode::CreateFile(file) => {
+                                tokio::spawn(async move {
+                                    filesystem::modify::create_file(&file).await.unwrap()
+                                });
+                            }
+                            Mode::RenameFile(from, new) => {
+                                tokio::spawn(async move {
+                                    filesystem::modify::rename_file(&from, &new).await.unwrap()
+                                });
+                            }
+                            Mode::DeleteFile(file, confirm) => {
+                                if confirm.to_lowercase() == "y" {
+                                    tokio::spawn(async move {
+                                        filesystem::modify::delete_file(&file).await.unwrap()
+                                    });
+                                }
+                            }
                             _ => {}
                         };
-                        self.ui.mode = Mode::Basic
                     }
                     _ => {}
                 }

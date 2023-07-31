@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 const FILEEXTENTION_MATCH: &str = &r"\.([0-9a-zA-Z]+)$";
 
 #[derive(PartialEq, Debug)]
@@ -16,6 +18,14 @@ pub fn get_type_by_name<'a>(name: &'a str) -> FileType<'a> {
                 .captures(name)
                 .map(|c| c.get(1).unwrap().as_str()),
         )
+    }
+}
+
+pub fn get_type<'a>(file: &'a PathBuf) -> FileType<'a> {
+    if file.is_dir() {
+        FileType::Folder
+    } else {
+        FileType::File(None)
     }
 }
 

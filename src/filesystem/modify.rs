@@ -21,3 +21,15 @@ pub async fn rename_file(original: &PathBuf, new: &str) -> Result<()> {
     fs::rename(original, PathBuf::from(new)).await?;
     Ok(())
 }
+
+pub async fn delete_file(file: &PathBuf) -> Result<()> {
+    match utils::get_type(file) {
+        utils::FileType::Folder => {
+            fs::remove_dir_all(file).await?;
+        }
+        utils::FileType::File(_) => {
+            fs::remove_file(file).await?;
+        }
+    }
+    Ok(())
+}
