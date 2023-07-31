@@ -9,9 +9,9 @@ use eyre::Result;
 
 use crate::ui::input::{InputModeResult, InputResult};
 
+mod filesystem;
 mod settings;
 mod ui;
-mod filesystem;
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
@@ -108,7 +108,12 @@ impl App {
                         self.ui.mode.remove_char();
                     }
                     InputResult::Mode(InputModeResult::Execute) => {
-                        todo!()
+                        match &self.ui.mode {
+                            Mode::CreateFile(file) => filesystem::modify::create_file(file).await?,
+                            Mode::RenameFile(from, new) => filesystem::modify::rename_file(from, new).await?,
+                            _ => {}
+                        };
+                        self.ui.mode = Mode::Basic
                     }
                     _ => {}
                 }
