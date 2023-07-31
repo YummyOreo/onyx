@@ -13,7 +13,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::app::Mode;
+use crate::Mode;
 
 pub mod input;
 
@@ -43,24 +43,21 @@ pub struct UiState {
 }
 
 impl UiState {
-    pub async fn input(&self, input: Event, files: &Vec<DirEntry>) -> input::InputResult {
+    pub async fn input(&self, input: Event, files: &[DirEntry]) -> input::InputResult {
         if let Event::Key(key_event) = input {
             if key_event.kind == KeyEventKind::Release {
                 return input::InputResult::Skip;
             }
             return input::match_keycode(
                 &self.mode,
-                files
-                    .get(self.selected)
-                    .expect("should be there")
-                    .path(),
+                files.get(self.selected).expect("should be there").path(),
                 key_event.code,
             );
         }
         input::InputResult::Skip
     }
 
-    pub fn draw(&self, f: &mut Frame<'_, impl Backend>, files: &Vec<DirEntry>) {
+    pub fn draw(&self, f: &mut Frame<'_, impl Backend>, files: &[DirEntry]) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
@@ -71,7 +68,7 @@ impl UiState {
         self.draw_input(f, layout[1]);
     }
 
-    fn draw_files(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect, files: &Vec<DirEntry>) {
+    fn draw_files(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect, files: &[DirEntry]) {
         let items = files
             .iter()
             .enumerate()

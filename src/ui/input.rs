@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crossterm::event::{Event, KeyCode};
 
-use crate::app::Mode;
+use crate::Mode;
 
 pub fn match_keycode(mode: &Mode, current_file: PathBuf, input: KeyCode) -> InputResult {
     match input {
