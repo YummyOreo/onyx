@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crossterm::event::{Event, KeyCode};
+use crossterm::event::KeyCode;
 
 use crate::Mode;
 

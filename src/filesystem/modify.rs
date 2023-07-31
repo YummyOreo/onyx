@@ -23,7 +23,7 @@ pub async fn rename_file(original: &PathBuf, new: &str) -> Result<()> {
 }
 
 pub async fn delete_file(file: &PathBuf) -> Result<()> {
-    match utils::get_type(file) {
+    match utils::get_type_by_path(file) {
         utils::FileType::Folder => {
             fs::remove_dir_all(file).await?;
         }

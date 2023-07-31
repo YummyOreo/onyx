@@ -1,4 +1,4 @@
-use std::{fs::DirEntry, io, path::PathBuf};
+use std::{fs::DirEntry, io};
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},

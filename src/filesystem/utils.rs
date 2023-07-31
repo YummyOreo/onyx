@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::path::Path;
 
-const FILEEXTENTION_MATCH: &str = &r"\.([0-9a-zA-Z]+)$";
+const FILE_EXTENTION_REGEX: &str = r"\.([0-9a-zA-Z]+)$";
 
 #[derive(PartialEq, Debug)]
 pub enum FileType<'a> {
@@ -8,12 +8,12 @@ pub enum FileType<'a> {
     Folder,
 }
 
-pub fn get_type_by_name<'a>(name: &'a str) -> FileType<'a> {
+pub fn get_type_by_name(name: &str) -> FileType {
     if name.ends_with('\\') || name.ends_with('/') {
         FileType::Folder
     } else {
         FileType::File(
-            regex::Regex::new(FILEEXTENTION_MATCH)
+            regex::Regex::new(FILE_EXTENTION_REGEX)
                 .unwrap()
                 .captures(name)
                 .map(|c| c.get(1).unwrap().as_str()),
@@ -21,7 +21,7 @@ pub fn get_type_by_name<'a>(name: &'a str) -> FileType<'a> {
     }
 }
 
-pub fn get_type<'a>(file: &'a PathBuf) -> FileType<'a> {
+pub fn get_type_by_path(file: &Path) -> FileType {
     if file.is_dir() {
         FileType::Folder
     } else {
