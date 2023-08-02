@@ -9,7 +9,7 @@ use eyre::{eyre, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph, ListState},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 
@@ -83,7 +83,9 @@ impl UiState {
             .unwrap();
 
         let block = Block::default().title("Files").borders(Borders::ALL);
-        let list = List::new(items).block(block).highlight_style(Style::default().bg(Color::Gray));
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(Style::default().bg(Color::Gray));
         self.scroll_state.select(Some(self.selected));
         f.render_stateful_widget(list, chunk, &mut self.scroll_state)
     }
