@@ -9,7 +9,7 @@ use eyre::{eyre, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph, ListState},
     Frame, Terminal,
 };
 
@@ -57,18 +57,18 @@ impl UiState {
         input::InputResult::Skip
     }
 
-    pub fn draw(&self, f: &mut Frame<'_, impl Backend>, files: &[DirEntry]) {
+    pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, files: &[DirEntry]) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Percentage(90), Constraint::Percentage(10)].as_ref())
+            .constraints([Constraint::Min(3), Constraint::Max(3)].as_ref())
             .split(f.size());
 
         self.draw_files(f, layout[0], files);
         self.draw_input(f, layout[1]);
     }
 
-    fn draw_files(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect, files: &[DirEntry]) {
+    fn draw_files(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, files: &[DirEntry]) {
         let items = files
             .iter()
             .enumerate()
@@ -89,7 +89,9 @@ impl UiState {
 
         let block = Block::default().title("Files").borders(Borders::ALL);
         let list = List::new(items).block(block);
-        f.render_widget(list, chunk)
+        let mut state = ListState::default();
+        state.select(Some(self.selected));
+        f.render_stateful_widget(list, chunk, &mut state)
     }
 
     fn draw_input(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect) {
