@@ -38,6 +38,7 @@ pub fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) ->
 
 pub struct UiState {
     pub selected: usize,
+    pub scroll_state: ListState,
     pub max: usize,
     pub mode: Mode,
 }
@@ -71,27 +72,20 @@ impl UiState {
     fn draw_files(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, files: &[DirEntry]) {
         let items = files
             .iter()
-            .enumerate()
-            .map(|(pos, file)| {
+            .map(|file| {
                 let text = file
                     .file_name()
                     .into_string()
                     .map_err(|s| eyre!("Could not convert filename {:?} to string", s))?;
-                let color = if pos == self.selected {
-                    Color::Gray
-                } else {
-                    Color::Reset
-                };
-                Ok(ListItem::new(text).style(Style::new().bg(color)))
+                Ok(ListItem::new(text))
             })
             .collect::<Result<Vec<ListItem>, eyre::Error>>()
             .unwrap();
 
         let block = Block::default().title("Files").borders(Borders::ALL);
-        let list = List::new(items).block(block);
-        let mut state = ListState::default();
-        state.select(Some(self.selected));
-        f.render_stateful_widget(list, chunk, &mut state)
+        let list = List::new(items).block(block).highlight_style(Style::default().bg(Color::Gray));
+        self.scroll_state.select(Some(self.selected));
+        f.render_stateful_widget(list, chunk, &mut self.scroll_state)
     }
 
     fn draw_input(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect) {

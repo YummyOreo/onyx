@@ -6,6 +6,7 @@ use std::{
 
 use crossterm::event;
 use eyre::Result;
+use ratatui::widgets::ListState;
 
 use crate::ui::input::{InputModeResult, InputResult};
 
@@ -61,6 +62,7 @@ impl App {
         let files = fs::read_dir(path.clone())?.map(|f| f.unwrap()).collect();
         let ui_state = ui::UiState {
             selected: 0,
+            scroll_state: ListState::default(),
             max: 0,
             mode: Mode::default(),
         };
