@@ -1,7 +1,4 @@
-use std::{
-    fs::{DirEntry, FileType},
-    io,
-};
+use std::{fs::DirEntry, io};
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
