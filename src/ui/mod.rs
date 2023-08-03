@@ -1,4 +1,7 @@
-use std::{fs::DirEntry, io};
+use std::{
+    fs::{DirEntry, FileType},
+    io,
+};
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
@@ -65,29 +68,55 @@ impl UiState {
             .constraints([Constraint::Min(3), Constraint::Max(3)].as_ref())
             .split(f.size());
 
-        self.draw_files(f, layout[0], files);
+        self.draw_files(f, layout[0], files).unwrap();
         self.draw_input(f, layout[1]);
     }
 
-    fn draw_files(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, files: &[DirEntry]) {
+    fn draw_files(
+        &mut self,
+        f: &mut Frame<'_, impl Backend>,
+        chunk: Rect,
+        files: &[DirEntry],
+    ) -> Result<()> {
         let items = files
             .iter()
-            .map(|file| {
+            .enumerate()
+            .map(|(pos, file)| {
                 let text = file
                     .file_name()
                     .into_string()
                     .map_err(|s| eyre!("Could not convert filename {:?} to string", s))?;
-                Ok(ListItem::new(text))
+                let style = if pos == self.selected {
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(self.get_file_color(file)?)
+                } else {
+                    Style::default().fg(self.get_file_color(file)?)
+                };
+                Ok(ListItem::new(text).style(style))
             })
             .collect::<Result<Vec<ListItem>, eyre::Error>>()
             .unwrap();
 
         let block = Block::default().title("Files").borders(Borders::ALL);
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(Style::default().bg(Color::Gray));
+        let list = List::new(items).block(block);
         self.scroll_state.select(Some(self.selected));
-        f.render_stateful_widget(list, chunk, &mut self.scroll_state)
+        f.render_stateful_widget(list, chunk, &mut self.scroll_state);
+        Ok(())
+    }
+
+    fn get_file_color(&mut self, file: &DirEntry) -> Result<Color> {
+        let kind = file.file_type()?;
+        if kind.is_dir() {
+            return Ok(Color::Cyan);
+        }
+        if kind.is_file() {
+            return Ok(Color::White);
+        }
+        if kind.is_symlink() {
+            return Ok(Color::Green);
+        }
+        Err(eyre!("unreachable"))
     }
 
     fn draw_input(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect) {
