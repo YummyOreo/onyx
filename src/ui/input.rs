@@ -16,6 +16,8 @@ pub fn match_keycode(mode: &Mode, current_file: PathBuf, input: KeyCode) -> Inpu
         }
         KeyCode::Up | KeyCode::Char('k') => InputResult::MoveUp,
         KeyCode::Down | KeyCode::Char('j') => InputResult::MoveDown,
+        KeyCode::Left | KeyCode::Char('h') => InputResult::GoBack,
+        KeyCode::Right | KeyCode::Char('l') => InputResult::EnterFolder,
         KeyCode::Char('q') => InputResult::Quit,
         KeyCode::Char('c') => {
             InputResult::Mode(InputModeResult::ModeChange(Mode::CreateFile(String::new())))
@@ -37,6 +39,8 @@ pub enum InputResult {
     MoveDown,
 
     Mode(InputModeResult),
+    EnterFolder,
+    GoBack,
 
     Quit,
     Skip,

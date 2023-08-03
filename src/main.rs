@@ -101,6 +101,17 @@ impl App {
                             .unwrap()
                             .clamp(0, self.ui.max);
                     }
+                    InputResult::EnterFolder => {
+                        let folder = &self.files[self.ui.selected];
+                        if folder.file_type().unwrap().is_dir() {
+                            self.path = folder.path().canonicalize()?
+                        }
+                        self.ui.selected = 0;
+                    }
+                    InputResult::GoBack => {
+                        self.path.pop();
+                        self.ui.selected = 0;
+                    }
                     InputResult::Mode(InputModeResult::ModeChange(m)) => {
                         self.ui.mode = m;
                     }
@@ -146,5 +157,5 @@ impl App {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    App::new(PathBuf::from("./"))?.run().await
+    App::new(PathBuf::from("./").canonicalize()?)?.run().await
 }
