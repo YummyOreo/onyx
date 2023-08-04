@@ -53,6 +53,7 @@ impl Mode {
 
 pub struct App {
     pub ui: ui::UiState,
+    pub selected: usize,
     pub path: PathBuf,
     pub files: Vec<DirEntry>,
 }
@@ -63,11 +64,11 @@ impl App {
         let ui_state = ui::UiState {
             selected: 0,
             scroll_state: ListState::default(),
-            max: 0,
             mode: Mode::default(),
         };
         Ok(Self {
             ui: ui_state,
+            selected: 0,
             files,
             path,
         })
@@ -78,8 +79,7 @@ impl App {
 
         loop {
             self.files = fs::read_dir(&self.path)?.map(|f| f.unwrap()).collect();
-            self.ui.max = self.files.len() - 1;
-            self.ui.selected = self.ui.selected.clamp(0, self.ui.max);
+            self.ui.selected = self.ui.selected.clamp(0, self.files.len() - 1);
             terminal.draw(|f| self.ui.draw(f, &self.files))?;
 
             let event_ready =
@@ -99,7 +99,7 @@ impl App {
                             .selected
                             .checked_add(1)
                             .unwrap()
-                            .clamp(0, self.ui.max);
+                            .clamp(0, self.files.len() - 1);
                     }
                     InputResult::EnterFolder => {
                         let folder = &self.files[self.ui.selected];

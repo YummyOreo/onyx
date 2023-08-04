@@ -39,7 +39,6 @@ pub fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) ->
 pub struct UiState {
     pub selected: usize,
     pub scroll_state: ListState,
-    pub max: usize,
     pub mode: Mode,
 }
 
