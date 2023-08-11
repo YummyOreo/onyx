@@ -13,7 +13,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::Mode;
+use crate::{Mode, State};
 
 pub mod input;
 
@@ -39,42 +39,45 @@ pub fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) ->
 pub struct UiState {
     pub selected: usize,
     pub scroll_state: ListState,
-    pub mode: Mode,
 }
 
 impl UiState {
-    pub async fn input(&self, input: Event, files: &[DirEntry]) -> input::InputResult {
+    pub async fn input(&self, input: Event, state: &State) -> input::InputResult {
         if let Event::Key(key_event) = input {
             if key_event.kind == KeyEventKind::Release {
                 return input::InputResult::Skip;
             }
             return input::match_keycode(
-                &self.mode,
-                files.get(self.selected).expect("should be there").path(),
+                &state.mode,
+                state
+                    .files
+                    .get(self.selected)
+                    .expect("should be there")
+                    .path(),
                 key_event.code,
             );
         }
         input::InputResult::Skip
     }
 
-    pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, files: &[DirEntry]) {
+    pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, state: &State) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([Constraint::Min(3), Constraint::Max(3)].as_ref())
             .split(f.size());
 
-        self.draw_files(f, layout[0], files).unwrap();
-        self.draw_input(f, layout[1]);
+        self.draw_files(f, layout[0], state).unwrap();
+        self.draw_input(f, layout[1], state);
     }
 
     fn draw_files(
         &mut self,
         f: &mut Frame<'_, impl Backend>,
         chunk: Rect,
-        files: &[DirEntry],
+        state: &State
     ) -> Result<()> {
-        let items = files
+        let items = state.files
             .iter()
             .enumerate()
             .map(|(pos, file)| {
@@ -115,15 +118,15 @@ impl UiState {
         Err(eyre!("unreachable"))
     }
 
-    fn draw_input(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect) {
-        let title = match &self.mode {
+    fn draw_input(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
+        let title = match &state.mode {
             Mode::Basic => "",
             Mode::CreateFile(_) => "Create File",
             Mode::RenameFile(_, _) => "Renaming file",
             Mode::DeleteFile(_, _) => "Deleting file",
         };
         let block = Block::default().title(title).borders(Borders::ALL);
-        let p = Paragraph::new(self.mode.get_str().unwrap_or("")).block(block);
+        let p = Paragraph::new(state.mode.get_str().unwrap_or("")).block(block);
         f.render_widget(p, chunk);
     }
 }
