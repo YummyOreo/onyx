@@ -68,7 +68,6 @@ impl App {
     pub fn new(path: PathBuf) -> Result<Self> {
         let files = fs::read_dir(path.clone())?.map(|f| f.unwrap()).collect();
         let ui_state = ui::UiState {
-            selected: 0,
             scroll_state: ListState::default(),
         };
 
@@ -88,7 +87,7 @@ impl App {
 
         loop {
             self.state.files = fs::read_dir(&self.path)?.map(|f| f.unwrap()).collect();
-            self.ui.selected = self.ui.selected.clamp(0, self.state.files.len() - 1);
+            self.state.selected = self.state.selected.clamp(0, self.state.files.len() - 1);
             terminal.draw(|f| self.ui.draw(f, &self.state))?;
 
             let event_ready =
@@ -100,26 +99,26 @@ impl App {
                         break;
                     }
                     InputResult::MoveUp => {
-                        self.ui.selected = self.ui.selected.checked_sub(1).unwrap_or_default();
+                        self.state.selected = self.state.selected.checked_sub(1).unwrap_or_default();
                     }
                     InputResult::MoveDown => {
-                        self.ui.selected = self
-                            .ui
+                        self.state.selected = self
+                            .state
                             .selected
                             .checked_add(1)
                             .unwrap()
                             .clamp(0, self.state.files.len() - 1);
                     }
                     InputResult::EnterFolder => {
-                        let folder = &self.state.files[self.ui.selected];
+                        let folder = &self.state.files[self.state.selected];
                         if folder.file_type().unwrap().is_dir() {
                             self.path = folder.path().canonicalize()?
                         }
-                        self.ui.selected = 0;
+                        self.state.selected = 0;
                     }
                     InputResult::GoBack => {
                         self.path.pop();
-                        self.ui.selected = 0;
+                        self.state.selected = 0;
                     }
                     InputResult::Mode(InputModeResult::ModeChange(m)) => {
                         self.state.mode = m;

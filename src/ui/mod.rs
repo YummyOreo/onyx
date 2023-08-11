@@ -37,7 +37,6 @@ pub fn restore_terminal(mut terminal: Terminal<CrosstermBackend<io::Stdout>>) ->
 }
 
 pub struct UiState {
-    pub selected: usize,
     pub scroll_state: ListState,
 }
 
@@ -51,7 +50,7 @@ impl UiState {
                 &state.mode,
                 state
                     .files
-                    .get(self.selected)
+                    .get(state.selected)
                     .expect("should be there")
                     .path(),
                 key_event.code,
@@ -85,7 +84,7 @@ impl UiState {
                     .file_name()
                     .into_string()
                     .map_err(|s| eyre!("Could not convert filename {:?} to string", s))?;
-                let style = if pos == self.selected {
+                let style = if pos == state.selected {
                     Style::default()
                         .fg(Color::Black)
                         .bg(self.get_file_color(file)?)
@@ -99,7 +98,7 @@ impl UiState {
 
         let block = Block::default().title("Files").borders(Borders::ALL);
         let list = List::new(items).block(block);
-        self.scroll_state.select(Some(self.selected));
+        self.scroll_state.select(Some(state.selected));
         f.render_stateful_widget(list, chunk, &mut self.scroll_state);
         Ok(())
     }
