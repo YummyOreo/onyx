@@ -7,6 +7,7 @@ use std::{
 use crossterm::event;
 use eyre::Result;
 use ratatui::widgets::ListState;
+use settings::parse_args;
 
 use crate::ui::input::{InputModeResult, InputResult};
 
@@ -166,6 +167,6 @@ impl App {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let s = settings::parse_args();
-    App::new(PathBuf::from(&s.dir).canonicalize()?)?.run().await
+    let settings = parse_args();
+    App::new(PathBuf::from(&settings.dir).canonicalize()?)?.run().await
 }
