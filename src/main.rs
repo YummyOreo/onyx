@@ -166,6 +166,6 @@ impl App {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let s = settings::parse_args()?;
+    let s = settings::parse_args();
     App::new(PathBuf::from(&s.dir).canonicalize()?)?.run().await
 }
