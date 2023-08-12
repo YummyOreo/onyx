@@ -9,13 +9,14 @@ use eyre::{eyre, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 
 use crate::{Mode, State};
 
 pub mod input;
+mod utils;
 
 pub fn make_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;
@@ -63,11 +64,11 @@ impl UiState {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Min(3), Constraint::Max(3)].as_ref())
+            .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
             .split(f.size());
 
         self.draw_files(f, layout[0], state).unwrap();
-        self.draw_input(f, layout[1], state);
+        self.draw_input(f, state);
     }
 
     fn draw_files(
@@ -97,8 +98,8 @@ impl UiState {
             .collect::<Result<Vec<ListItem>, eyre::Error>>()
             .unwrap();
 
-        let block = Block::default().title("Files").borders(Borders::ALL);
-        let list = List::new(items).block(block);
+        // let block = Block::default().title("Files").borders(Borders::ALL);
+        let list = List::new(items);
         self.scroll_state.select(Some(state.selected));
         f.render_stateful_widget(list, chunk, &mut self.scroll_state);
         Ok(())
@@ -118,15 +119,20 @@ impl UiState {
         Err(eyre!("unreachable"))
     }
 
-    fn draw_input(&self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
-        let title = match &state.mode {
-            Mode::Basic => "",
-            Mode::CreateFile(_) => "Create File",
-            Mode::RenameFile(_, _) => "Renaming file",
-            Mode::DeleteFile(_, _) => "Deleting file",
-        };
-        let block = Block::default().title(title).borders(Borders::ALL);
-        let p = Paragraph::new(state.mode.get_str().unwrap_or("")).block(block);
-        f.render_widget(p, chunk);
+    fn draw_input(&self, f: &mut Frame<'_, impl Backend>, state: &State) {
+        if state.mode != Mode::Basic {
+            let title = match &state.mode {
+                Mode::Basic => "",
+                Mode::CreateFile(_) => "Create File",
+                Mode::RenameFile(_, _) => "Renaming file",
+                Mode::DeleteFile(_, _) => "Deleting file",
+            };
+
+            let block = Block::default().title(title).borders(Borders::ALL);
+            let p = Paragraph::new(state.mode.get_str().unwrap_or("")).block(block);
+            let area = utils::centered_rect(60, 3, f.size());
+            f.render_widget(Clear, area); //this clears out the background
+            f.render_widget(p, area);
+        }
     }
 }
