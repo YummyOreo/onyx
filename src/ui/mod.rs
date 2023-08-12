@@ -74,9 +74,10 @@ impl UiState {
         &mut self,
         f: &mut Frame<'_, impl Backend>,
         chunk: Rect,
-        state: &State
+        state: &State,
     ) -> Result<()> {
-        let items = state.files
+        let items = state
+            .files
             .iter()
             .enumerate()
             .map(|(pos, file)| {

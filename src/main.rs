@@ -99,7 +99,8 @@ impl App {
                         break;
                     }
                     InputResult::MoveUp => {
-                        self.state.selected = self.state.selected.checked_sub(1).unwrap_or_default();
+                        self.state.selected =
+                            self.state.selected.checked_sub(1).unwrap_or_default();
                     }
                     InputResult::MoveDown => {
                         self.state.selected = self
