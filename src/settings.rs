@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use eyre::Result;
 
@@ -6,7 +8,7 @@ use eyre::Result;
 pub struct Settings {
     // the dir that should be opened
     #[arg(short, long)]
-    pub dir: Option<String>,
+    pub dir: Option<PathBuf>,
 }
 
 pub fn parse_args() -> Result<Settings> {
