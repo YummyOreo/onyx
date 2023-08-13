@@ -1,10 +1,11 @@
-use std::{fs, path::PathBuf, time::Duration};
+use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{InfoKind, Mode, State};
+use tokio::sync::Mutex;
 
 use crate::ui::input::{InputModeResult, InputResult};
 
@@ -15,7 +16,7 @@ mod ui;
 
 pub struct App {
     pub ui: ui::UiState,
-    pub state: State,
+    pub state: Arc<Mutex<State>>,
 }
 
 impl App {
@@ -33,7 +34,7 @@ impl App {
         };
         Ok(Self {
             ui: ui_state,
-            state,
+            state: Arc::new(Mutex::new(state)),
         })
     }
 
@@ -41,70 +42,88 @@ impl App {
         let mut terminal = ui::make_terminal()?;
 
         loop {
-            self.state.files = fs::read_dir(&self.state.path)?
-                .map(|f| f.unwrap())
-                .collect();
-            self.state.selected = self.state.selected.clamp(0, self.state.files.len() - 1);
-            terminal.draw(|f| self.ui.draw(f, &self.state))?;
+            let mut state = self.state.lock().await;
+            state.files = fs::read_dir(&state.path)?.map(|f| f.unwrap()).collect();
+            state.selected = state.selected.clamp(0, state.files.len() - 1);
+            terminal.draw(|f| self.ui.draw(f, &state))?;
 
             let event_ready =
                 tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
 
             if event_ready.await?? {
-                match self.ui.input(event::read()?, &self.state).await {
+                match self.ui.input(event::read()?, &state).await {
                     InputResult::Quit => {
                         break;
                     }
                     InputResult::MoveUp => {
-                        self.state.selected =
-                            self.state.selected.checked_sub(1).unwrap_or_default();
+                        state.selected = state.selected.checked_sub(1).unwrap_or_default();
                     }
                     InputResult::MoveDown => {
-                        self.state.selected = self
-                            .state
+                        state.selected = state
                             .selected
                             .checked_add(1)
                             .unwrap()
-                            .clamp(0, self.state.files.len() - 1);
+                            .clamp(0, state.files.len() - 1);
                     }
                     InputResult::EnterFolder => {
-                        let folder = &self.state.files[self.state.selected];
+                        let folder = &state.files[state.selected];
                         if folder.file_type().unwrap().is_dir() {
-                            self.state.path = folder.path().canonicalize()?
+                            state.path = folder.path().canonicalize()?
                         }
-                        self.state.selected = 0;
+                        state.selected = 0;
                     }
                     InputResult::GoBack => {
-                        self.state.path.pop();
-                        self.state.selected = 0;
+                        state.path.pop();
+                        state.selected = 0;
                     }
                     InputResult::Mode(InputModeResult::ModeChange(m)) => {
-                        self.state.mode = m;
+                        state.mode = m;
                     }
                     InputResult::Mode(InputModeResult::AddChar(c)) => {
-                        self.state.mode.add_char(c);
+                        state.mode.add_char(c);
                     }
                     InputResult::Mode(InputModeResult::RemoveChar) => {
-                        self.state.mode.remove_char();
+                        state.mode.remove_char();
                     }
                     InputResult::Mode(InputModeResult::Execute) => {
                         let mut mode = Mode::Basic;
-                        core::mem::swap(&mut self.state.mode, &mut mode);
+                        core::mem::swap(&mut state.mode, &mut mode);
                         match mode {
                             Mode::CreateFile(file) => {
+                                let state = self.state.clone();
                                 tokio::spawn(async move {
-                                    filesystem::modify::create_file(&file).await.unwrap()
+                                    match filesystem::modify::create_file(&file).await {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            state.clone().lock().await.info.push(InfoKind::Error(e))
+                                        }
+                                    }
                                 });
                             }
                             Mode::RenameFile(from, new) => {
+                                let state = self.state.clone();
                                 tokio::spawn(async move {
-                                    filesystem::modify::rename_file(&from, &new).await.unwrap()
+                                    match filesystem::modify::rename_file(&from, &new).await {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            state.clone().lock().await.info.push(InfoKind::Error(e))
+                                        }
+                                    }
                                 });
                             }
                             Mode::DeleteFile(file, confirm) => {
                                 if confirm.to_lowercase() == "y" {
+                                    let state = self.state.clone();
                                     tokio::spawn(async move {
-                                        filesystem::modify::delete_file(&file).await.unwrap()
+                                        match filesystem::modify::delete_file(&file).await {
+                                            Ok(_) => {}
+                                            Err(e) => state
+                                                .clone()
+                                                .lock()
+                                                .await
+                                                .info
+                                                .push(InfoKind::Error(e)),
+                                        }
                                     });
                                 }
                             }

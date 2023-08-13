@@ -160,7 +160,7 @@ impl UiState {
                         .unwrap()
                         .to_string(),
                 )
-                .style(Style::default().bg(Color::Red).fg(Color::DarkGray)),
+                .style(Style::default().bg(Color::Red)),
                 InfoKind::Message(s) => Paragraph::new(s.to_string()),
             };
             f.render_widget(p, chunk)
