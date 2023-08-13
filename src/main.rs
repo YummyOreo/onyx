@@ -94,9 +94,7 @@ impl App {
                                 tokio::spawn(async move {
                                     match filesystem::modify::create_file(&file).await {
                                         Ok(_) => {}
-                                        Err(e) => {
-                                            state.clone().lock().await.info.push(InfoKind::Error(e))
-                                        }
+                                        Err(e) => state.lock().await.info.push(InfoKind::Error(e)),
                                     }
                                 });
                             }
@@ -105,9 +103,7 @@ impl App {
                                 tokio::spawn(async move {
                                     match filesystem::modify::rename_file(&from, &new).await {
                                         Ok(_) => {}
-                                        Err(e) => {
-                                            state.clone().lock().await.info.push(InfoKind::Error(e))
-                                        }
+                                        Err(e) => state.lock().await.info.push(InfoKind::Error(e)),
                                     }
                                 });
                             }
@@ -117,12 +113,9 @@ impl App {
                                     tokio::spawn(async move {
                                         match filesystem::modify::delete_file(&file).await {
                                             Ok(_) => {}
-                                            Err(e) => state
-                                                .clone()
-                                                .lock()
-                                                .await
-                                                .info
-                                                .push(InfoKind::Error(e)),
+                                            Err(e) => {
+                                                state.lock().await.info.push(InfoKind::Error(e))
+                                            }
                                         }
                                     });
                                 }
