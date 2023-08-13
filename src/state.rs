@@ -46,6 +46,7 @@ pub enum InfoKind {
 
 #[derive(Default)]
 pub struct State {
+    pub path: PathBuf,
     pub files: Vec<DirEntry>,
     pub selected: usize,
     pub mode: Mode,

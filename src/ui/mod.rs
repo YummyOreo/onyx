@@ -13,7 +13,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::{Mode, State, state::InfoKind};
+use crate::{state::InfoKind, Mode, State};
 
 pub mod input;
 mod utils;
@@ -64,12 +64,24 @@ impl UiState {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(0)
-            .constraints([Constraint::Min(0), Constraint::Max(1)].as_ref())
+            .constraints(
+                [
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                    Constraint::Length(1),
+                ]
+                .as_ref(),
+            )
             .split(f.size());
 
-        self.draw_files(f, layout[0], state).unwrap();
+        self.draw_path(f, layout[0], state.path.to_str().unwrap());
+        self.draw_files(f, layout[1], state).unwrap();
         self.draw_input(f, state);
-        self.draw_info(f, layout[1], state);
+        self.draw_info(f, layout[2], state);
+    }
+
+    fn draw_path(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, path: &str) {
+        f.render_widget(Paragraph::new(path.replace("\\\\?\\", "")), chunk);
     }
 
     fn draw_files(
@@ -152,6 +164,8 @@ impl UiState {
                 InfoKind::Message(s) => Paragraph::new(s.to_string()),
             };
             f.render_widget(p, chunk)
+        } else {
+            // do something if there is nothing here
         }
     }
 }

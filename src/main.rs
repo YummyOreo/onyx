@@ -15,7 +15,6 @@ mod ui;
 
 pub struct App {
     pub ui: ui::UiState,
-    pub path: PathBuf,
     pub state: State,
 }
 
@@ -29,11 +28,11 @@ impl App {
         let state = State {
             files,
             info: vec![InfoKind::Error(eyre::eyre!("Could not find file: x"))],
+            path,
             ..Default::default()
         };
         Ok(Self {
             ui: ui_state,
-            path,
             state,
         })
     }
@@ -42,7 +41,9 @@ impl App {
         let mut terminal = ui::make_terminal()?;
 
         loop {
-            self.state.files = fs::read_dir(&self.path)?.map(|f| f.unwrap()).collect();
+            self.state.files = fs::read_dir(&self.state.path)?
+                .map(|f| f.unwrap())
+                .collect();
             self.state.selected = self.state.selected.clamp(0, self.state.files.len() - 1);
             terminal.draw(|f| self.ui.draw(f, &self.state))?;
 
@@ -69,12 +70,12 @@ impl App {
                     InputResult::EnterFolder => {
                         let folder = &self.state.files[self.state.selected];
                         if folder.file_type().unwrap().is_dir() {
-                            self.path = folder.path().canonicalize()?
+                            self.state.path = folder.path().canonicalize()?
                         }
                         self.state.selected = 0;
                     }
                     InputResult::GoBack => {
-                        self.path.pop();
+                        self.state.path.pop();
                         self.state.selected = 0;
                     }
                     InputResult::Mode(InputModeResult::ModeChange(m)) => {
