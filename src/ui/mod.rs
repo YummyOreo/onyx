@@ -13,7 +13,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::{Mode, State};
+use crate::{Mode, State, state::InfoKind};
 
 pub mod input;
 mod utils;
@@ -63,12 +63,13 @@ impl UiState {
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, state: &State) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .margin(1)
-            .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+            .margin(0)
+            .constraints([Constraint::Min(0), Constraint::Max(1)].as_ref())
             .split(f.size());
 
         self.draw_files(f, layout[0], state).unwrap();
         self.draw_input(f, state);
+        self.draw_info(f, layout[1], state);
     }
 
     fn draw_files(
@@ -133,6 +134,24 @@ impl UiState {
             let area = utils::centered_rect(60, 3, f.size());
             f.render_widget(Clear, area); //this clears out the background
             f.render_widget(p, area);
+        }
+    }
+
+    fn draw_info(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
+        if let Some(i) = state.info.last() {
+            let p = match &i {
+                InfoKind::Error(r) => Paragraph::new(
+                    format!("{r}")
+                        .split('\n')
+                        .peekable()
+                        .next()
+                        .unwrap()
+                        .to_string(),
+                )
+                .style(Style::default().bg(Color::Red).fg(Color::DarkGray)),
+                InfoKind::Message(s) => Paragraph::new(s.to_string()),
+            };
+            f.render_widget(p, chunk)
         }
     }
 }
