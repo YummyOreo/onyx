@@ -1,11 +1,10 @@
-use std::{fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{fs, path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{InfoKind, Mode, State};
-use tokio::sync::Mutex;
 
 use crate::ui::input::{InputModeResult, InputResult};
 
@@ -16,7 +15,7 @@ mod ui;
 
 pub struct App {
     pub ui: ui::UiState,
-    pub state: Arc<Mutex<State>>,
+    pub state: State,
 }
 
 impl App {
@@ -34,7 +33,7 @@ impl App {
         };
         Ok(Self {
             ui: ui_state,
-            state: Arc::new(Mutex::new(state)),
+            state,
         })
     }
 
@@ -42,16 +41,16 @@ impl App {
         let mut terminal = ui::make_terminal()?;
 
         loop {
-            let mut state = self.state.lock().await;
+            let state = &mut self.state;
             state.files = fs::read_dir(&state.path)?.map(|f| f.unwrap()).collect();
             state.selected = state.selected.clamp(0, state.files.len() - 1);
-            terminal.draw(|f| self.ui.draw(f, &state))?;
+            terminal.draw(|f| self.ui.draw(f, state))?;
 
             let event_ready =
                 tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
 
             if event_ready.await?? {
-                match self.ui.input(event::read()?, &state).await {
+                match self.ui.input(event::read()?, state).await {
                     InputResult::Quit => {
                         break;
                     }
@@ -90,34 +89,23 @@ impl App {
                         core::mem::swap(&mut state.mode, &mut mode);
                         match mode {
                             Mode::CreateFile(file) => {
-                                let state = self.state.clone();
-                                tokio::spawn(async move {
-                                    match filesystem::modify::create_file(&file).await {
-                                        Ok(_) => {}
-                                        Err(e) => state.lock().await.info.push(InfoKind::Error(e)),
-                                    }
-                                });
+                                match filesystem::modify::create_file(&file).await {
+                                    Ok(_) => {}
+                                    Err(e) => state.info.push(InfoKind::Error(e)),
+                                }
                             }
                             Mode::RenameFile(from, new) => {
-                                let state = self.state.clone();
-                                tokio::spawn(async move {
-                                    match filesystem::modify::rename_file(&from, &new).await {
-                                        Ok(_) => {}
-                                        Err(e) => state.lock().await.info.push(InfoKind::Error(e)),
-                                    }
-                                });
+                                match filesystem::modify::rename_file(&from, &new).await {
+                                    Ok(_) => {}
+                                    Err(e) => state.info.push(InfoKind::Error(e)),
+                                }
                             }
                             Mode::DeleteFile(file, confirm) => {
                                 if confirm.to_lowercase() == "y" {
-                                    let state = self.state.clone();
-                                    tokio::spawn(async move {
-                                        match filesystem::modify::delete_file(&file).await {
-                                            Ok(_) => {}
-                                            Err(e) => {
-                                                state.lock().await.info.push(InfoKind::Error(e))
-                                            }
-                                        }
-                                    });
+                                    match filesystem::modify::delete_file(&file).await {
+                                        Ok(_) => {}
+                                        Err(e) => state.info.push(InfoKind::Error(e)),
+                                    }
                                 }
                             }
                             _ => {}
