@@ -4,7 +4,7 @@ use crossterm::event;
 use eyre::Result;
 use ratatui::widgets::ListState;
 use settings::parse_args;
-use state::{InfoKind, Mode, State};
+use state::{Info, InfoKind, Mode, State};
 
 use crate::ui::input::{InputModeResult, InputResult};
 
@@ -27,7 +27,9 @@ impl App {
 
         let state = State {
             files,
-            info: vec![InfoKind::Error(eyre::eyre!("Could not find file: x"))],
+            info: vec![Info::new(InfoKind::Error(eyre::eyre!(
+                "Could not find file: x"
+            )))],
             path,
             ..Default::default()
         };
@@ -45,6 +47,7 @@ impl App {
             state.files = fs::read_dir(&state.path)?.map(|f| f.unwrap()).collect();
             state.selected = state.selected.clamp(0, state.files.len() - 1);
             terminal.draw(|f| self.ui.draw(f, state))?;
+            State::purge_info(&mut state.info, Duration::from_secs(4)).await;
 
             let event_ready =
                 tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
@@ -91,20 +94,20 @@ impl App {
                             Mode::CreateFile(file) => {
                                 match filesystem::modify::create_file(&file).await {
                                     Ok(_) => {}
-                                    Err(e) => state.info.push(InfoKind::Error(e)),
+                                    Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
                                 }
                             }
                             Mode::RenameFile(from, new) => {
                                 match filesystem::modify::rename_file(&from, &new).await {
                                     Ok(_) => {}
-                                    Err(e) => state.info.push(InfoKind::Error(e)),
+                                    Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
                                 }
                             }
                             Mode::DeleteFile(file, confirm) => {
                                 if confirm.to_lowercase() == "y" {
                                     match filesystem::modify::delete_file(&file).await {
                                         Ok(_) => {}
-                                        Err(e) => state.info.push(InfoKind::Error(e)),
+                                        Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
                                     }
                                 }
                             }

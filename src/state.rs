@@ -1,6 +1,10 @@
-use std::{fs::DirEntry, path::PathBuf};
+use std::{
+    fs::DirEntry,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
-use eyre::Report;
+use eyre::{Report, Result};
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
@@ -44,11 +48,31 @@ pub enum InfoKind {
     Message(String),
 }
 
+pub struct Info {
+    pub kind: InfoKind,
+    pub time: Instant,
+}
+
+impl Info {
+    pub fn new(k: InfoKind) -> Self {
+        Self {
+            kind: k,
+            time: Instant::now(),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct State {
     pub path: PathBuf,
     pub files: Vec<DirEntry>,
     pub selected: usize,
     pub mode: Mode,
-    pub info: Vec<InfoKind>,
+    pub info: Vec<Info>,
+}
+
+impl State {
+    pub async fn purge_info(infos: &mut Vec<Info>, d: Duration) {
+        infos.retain(|i| i.time.elapsed() < d);
+    }
 }

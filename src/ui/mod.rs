@@ -151,7 +151,7 @@ impl UiState {
 
     fn draw_info(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
         if let Some(i) = state.info.last() {
-            let p = match &i {
+            let p = match &i.kind {
                 InfoKind::Error(r) => Paragraph::new(
                     format!("{r}")
                         .split('\n')
