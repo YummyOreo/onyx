@@ -2,6 +2,7 @@ use std::{fs, path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
+use filesystem::read::ReadRes;
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};
@@ -20,7 +21,7 @@ pub struct App {
 
 impl App {
     pub fn new(path: PathBuf) -> Result<Self> {
-        let files = fs::read_dir(path.clone())?.map(|f| f.unwrap()).collect();
+        let files = vec![];
         let ui_state = ui::UiState {
             scroll_state: ListState::default(),
         };
@@ -44,7 +45,18 @@ impl App {
 
         loop {
             let state = &mut self.state;
-            state.files = fs::read_dir(&state.path)?.map(|f| f.unwrap()).collect();
+            state.files =
+                match filesystem::read::read_with_fallback(&state.path, PathBuf::from("./"))? {
+                    ReadRes::Read(files) => files,
+                    ReadRes::FallBack(p, r, files) => {
+                        state.path = p;
+                        state.info.push(Info::new(InfoKind::Error(r)));
+                        files
+                    }
+                };
+            if !state.path.is_absolute() {
+                state.path = state.path.canonicalize()?;
+            }
             state.selected = state.selected.clamp(0, state.files.len() - 1);
             terminal.draw(|f| self.ui.draw(f, state))?;
             State::purge_info(&mut state.info, Duration::from_secs(4)).await;
@@ -127,7 +139,7 @@ impl App {
 #[tokio::main]
 async fn main() -> Result<()> {
     let settings = parse_args();
-    App::new(PathBuf::from(&settings.dir).canonicalize()?)?
+    App::new(PathBuf::from(&settings.dir))?
         .run()
         .await
 }
