@@ -21,16 +21,14 @@ pub struct App {
 
 impl App {
     pub fn new(path: PathBuf) -> Result<Self> {
-        let files = vec![];
+        let files = Vec::default();
         let ui_state = ui::UiState {
             scroll_state: ListState::default(),
         };
 
         let state = State {
             files,
-            info: vec![Info::new(InfoKind::Error(eyre::eyre!(
-                "Could not find file: x"
-            )))],
+            info: Vec::default(),
             path,
             ..Default::default()
         };
