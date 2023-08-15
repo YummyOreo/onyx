@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
@@ -48,9 +48,9 @@ impl App {
             state.files =
                 match filesystem::read::read_with_fallback(&state.path, PathBuf::from("./"))? {
                     ReadRes::Read(files) => files,
-                    ReadRes::FallBack(p, r, files) => {
-                        state.path = p;
-                        state.info.push(Info::new(InfoKind::Error(r)));
+                    ReadRes::FallBack { error, files } => {
+                        state.path = PathBuf::from("./");
+                        state.info.push(Info::new(InfoKind::Error(error)));
                         files
                     }
                 };
@@ -139,7 +139,5 @@ impl App {
 #[tokio::main]
 async fn main() -> Result<()> {
     let settings = parse_args();
-    App::new(PathBuf::from(&settings.dir))?
-        .run()
-        .await
+    App::new(PathBuf::from(&settings.dir))?.run().await
 }

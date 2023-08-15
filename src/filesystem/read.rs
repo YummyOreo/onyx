@@ -6,7 +6,7 @@ use std::{
 use eyre::{Report, Result};
 
 pub enum ReadRes {
-    FallBack(PathBuf, Report, Vec<DirEntry>),
+    FallBack { error: Report, files: Vec<DirEntry> },
     Read(Vec<DirEntry>),
 }
 
@@ -15,10 +15,9 @@ pub fn read_with_fallback(path: &PathBuf, fallback: PathBuf) -> Result<ReadRes> 
         Ok(t) => Ok(ReadRes::Read(
             t.collect::<Result<Vec<DirEntry>, std::io::Error>>()?,
         )),
-        Err(e) => Ok(ReadRes::FallBack(
-            fallback.clone(),
-            e.into(),
-            fs::read_dir(&fallback)?.collect::<Result<Vec<DirEntry>, std::io::Error>>()?,
-        )),
+        Err(e) => Ok(ReadRes::FallBack {
+            error: e.into(),
+            files: fs::read_dir(&fallback)?.collect::<Result<Vec<DirEntry>, std::io::Error>>()?,
+        }),
     }
 }
