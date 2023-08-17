@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["YummyOreo"]
 edition = "2021"
 
+[[bin]]
+name = "ox"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
