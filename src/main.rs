@@ -55,6 +55,7 @@ impl App {
             if !state.path.is_absolute() {
                 state.path = state.path.canonicalize()?;
             }
+
             state.selected = state.selected.clamp(0, state.files.len() - 1);
             terminal.draw(|f| self.ui.draw(f, state))?;
             State::purge_info(&mut state.info, Duration::from_secs(4)).await;
