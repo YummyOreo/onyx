@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use eyre::{Report, Result};
+use eyre::Report;
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
