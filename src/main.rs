@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
-use filesystem::read::ReadRes;
+use filesystem::read::{read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};
@@ -43,15 +43,14 @@ impl App {
 
         loop {
             let state = &mut self.state;
-            state.files =
-                match filesystem::read::read_with_fallback(&state.path, PathBuf::from("./"))? {
-                    ReadRes::Read(files) => files,
-                    ReadRes::FallBack { error, files } => {
-                        state.path = PathBuf::from("./");
-                        state.info.push(Info::new(InfoKind::Error(error)));
-                        files
-                    }
-                };
+            state.files = match read_with_fallback(&state.path, PathBuf::from("./"))? {
+                ReadRes::Read(files) => files,
+                ReadRes::FallBack { error, files } => {
+                    state.path = PathBuf::from("./");
+                    state.info.push(Info::new(InfoKind::Error(error)));
+                    files
+                }
+            };
             if !state.path.is_absolute() {
                 state.path = state.path.canonicalize()?;
             }

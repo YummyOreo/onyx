@@ -5,7 +5,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use eyre::{eyre, Result};
+use eyre::{eyre, Context, ContextCompat, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
@@ -17,6 +17,8 @@ use crate::{state::InfoKind, Mode, State};
 
 pub mod input;
 mod utils;
+
+const UI_ERROR_WRAP: &str = "Error while rendering ui:";
 
 pub fn make_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;
@@ -74,13 +76,20 @@ impl UiState {
             )
             .split(f.size());
 
-        self.draw_path(f, layout[0], state.path.to_str().unwrap());
-        self.draw_files(f, layout[1], state).unwrap();
+        self.draw_path(
+            f,
+            layout[0],
+            state.path.to_str().wrap_err(UI_ERROR_WRAP).unwrap(),
+        );
+        self.draw_files(f, layout[1], state)
+            .wrap_err(UI_ERROR_WRAP)
+            .unwrap();
         self.draw_input(f, state);
         self.draw_info(f, layout[2], state);
     }
 
     fn draw_path(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, path: &str) {
+        // Remove some windows stuff
         f.render_widget(Paragraph::new(path.replace("\\\\?\\", "")), chunk);
     }
 
@@ -95,10 +104,13 @@ impl UiState {
             .iter()
             .enumerate()
             .map(|(pos, file)| {
-                let text = file
-                    .file_name()
-                    .into_string()
-                    .map_err(|s| eyre!("Could not convert filename {:?} to string", s))?;
+                let text = file.file_name().into_string().map_err(|s| {
+                    eyre!(
+                        "{UI_ERROR_WRAP}\nCould not convert filename {:?} to string",
+                        s
+                    )
+                })?;
+
                 let style = if pos == state.selected {
                     Style::default()
                         .fg(Color::Black)
@@ -109,9 +121,9 @@ impl UiState {
                 Ok(ListItem::new(text).style(style))
             })
             .collect::<Result<Vec<ListItem>, eyre::Error>>()
+            .wrap_err(UI_ERROR_WRAP)
             .unwrap();
 
-        // let block = Block::default().title("Files").borders(Borders::ALL);
         let list = List::new(items);
         self.scroll_state.select(Some(state.selected));
         f.render_stateful_widget(list, chunk, &mut self.scroll_state);
@@ -157,6 +169,7 @@ impl UiState {
                         .split('\n')
                         .peekable()
                         .next()
+                        .wrap_err(UI_ERROR_WRAP)
                         .unwrap()
                         .to_string(),
                 )
