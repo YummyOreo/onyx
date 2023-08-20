@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
-use filesystem::read::ReadRes;
+use filesystem::read::{read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};
@@ -43,15 +43,14 @@ impl App {
 
         loop {
             let state = &mut self.state;
-            state.files =
-                match filesystem::read::read_with_fallback(&state.path, PathBuf::from("./"))? {
-                    ReadRes::Read(files) => files,
-                    ReadRes::FallBack { error, files } => {
-                        state.path = PathBuf::from("./");
-                        state.info.push(Info::new(InfoKind::Error(error)));
-                        files
-                    }
-                };
+            state.files = match read_with_fallback(&state.path, PathBuf::from("./"))? {
+                ReadRes::Read(files) => files,
+                ReadRes::FallBack { error, files } => {
+                    state.path = PathBuf::from("./");
+                    state.info.push(Info::new(InfoKind::Error(error)));
+                    files
+                }
+            };
             if !state.path.is_absolute() {
                 state.path = state.path.canonicalize()?;
             }
@@ -63,75 +62,80 @@ impl App {
             let event_ready =
                 tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(250)));
 
-            if event_ready.await?? {
-                match self.ui.input(event::read()?, state).await {
-                    InputResult::Quit => {
-                        break;
-                    }
-                    InputResult::MoveUp => {
-                        state.selected = state.selected.checked_sub(1).unwrap_or_default();
-                    }
-                    InputResult::MoveDown => {
-                        state.selected = state
-                            .selected
-                            .checked_add(1)
-                            .unwrap()
-                            .clamp(0, state.files.len() - 1);
-                    }
-                    InputResult::EnterFolder => {
-                        let folder = &state.files[state.selected];
-                        if folder.file_type().unwrap().is_dir() {
-                            state.path = folder.path().canonicalize()?
-                        }
-                        state.selected = 0;
-                    }
-                    InputResult::GoBack => {
-                        state.path.pop();
-                        state.selected = 0;
-                    }
-                    InputResult::Mode(InputModeResult::ModeChange(m)) => {
-                        state.mode = m;
-                    }
-                    InputResult::Mode(InputModeResult::AddChar(c)) => {
-                        state.mode.add_char(c);
-                    }
-                    InputResult::Mode(InputModeResult::RemoveChar) => {
-                        state.mode.remove_char();
-                    }
-                    InputResult::Mode(InputModeResult::Execute) => {
-                        let mut mode = Mode::Basic;
-                        core::mem::swap(&mut state.mode, &mut mode);
-                        match mode {
-                            Mode::CreateFile(file) => {
-                                match filesystem::modify::create_file(&file).await {
-                                    Ok(_) => {}
-                                    Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
-                                }
-                            }
-                            Mode::RenameFile(from, new) => {
-                                match filesystem::modify::rename_file(&from, &new).await {
-                                    Ok(_) => {}
-                                    Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
-                                }
-                            }
-                            Mode::DeleteFile(file, confirm) => {
-                                if confirm.to_lowercase() == "y" {
-                                    match filesystem::modify::delete_file(&file).await {
-                                        Ok(_) => {}
-                                        Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
-                                    }
-                                }
-                            }
-                            _ => {}
-                        };
-                    }
-                    _ => {}
-                }
+            if event_ready.await??
+                && App::handle_input(self.ui.input(event::read()?, state).await, state).await?
+            {
+                break;
             }
         }
 
         // restore terminal
         ui::restore_terminal(terminal)
+    }
+
+    async fn handle_input(input: InputResult, state: &mut State) -> Result<bool> {
+        match input {
+            InputResult::Quit => {
+                return Ok(true);
+            }
+            InputResult::MoveUp => {
+                state.selected = state.selected.checked_sub(1).unwrap_or_default();
+            }
+            InputResult::MoveDown => {
+                state.selected = state
+                    .selected
+                    .checked_add(1)
+                    .unwrap()
+                    .clamp(0, state.files.len() - 1);
+            }
+            InputResult::EnterFolder => {
+                let folder = &state.files[state.selected];
+                if folder.file_type().unwrap().is_dir() {
+                    state.path = folder.path().canonicalize()?
+                }
+                state.selected = 0;
+            }
+            InputResult::GoBack => {
+                state.path.pop();
+                state.selected = 0;
+            }
+            InputResult::Mode(InputModeResult::ModeChange(m)) => {
+                state.mode = m;
+            }
+            InputResult::Mode(InputModeResult::AddChar(c)) => {
+                state.mode.add_char(c);
+            }
+            InputResult::Mode(InputModeResult::RemoveChar) => {
+                state.mode.remove_char();
+            }
+            InputResult::Mode(InputModeResult::Execute) => {
+                let mut mode = Mode::Basic;
+                core::mem::swap(&mut state.mode, &mut mode);
+                match mode {
+                    Mode::CreateFile(file) => match filesystem::modify::create_file(&file).await {
+                        Ok(_) => {}
+                        Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
+                    },
+                    Mode::RenameFile(from, new) => {
+                        match filesystem::modify::rename_file(&from, &new).await {
+                            Ok(_) => {}
+                            Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
+                        }
+                    }
+                    Mode::DeleteFile(file, confirm) => {
+                        if confirm.to_lowercase() == "y" {
+                            match filesystem::modify::delete_file(&file).await {
+                                Ok(_) => {}
+                                Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
+                            }
+                        }
+                    }
+                    _ => {}
+                };
+            }
+            _ => {}
+        }
+        Ok(false)
     }
 }
 
