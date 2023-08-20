@@ -43,7 +43,7 @@ impl App {
 
         loop {
             let state = &mut self.state;
-            state.files = match read_with_fallback(&state.path, PathBuf::from("./"))? {
+            state.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
                 ReadRes::Read(files) => files,
                 ReadRes::FallBack { error, files } => {
                     state.path = PathBuf::from("./");
@@ -90,8 +90,8 @@ impl App {
             }
             InputResult::EnterFolder => {
                 let folder = &state.files[state.selected];
-                if folder.file_type().unwrap().is_dir() {
-                    state.path = folder.path().canonicalize()?
+                if folder.file_type.is_dir() {
+                    state.path = folder.path.canonicalize()?
                 }
                 state.selected = 0;
             }

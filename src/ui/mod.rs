@@ -1,4 +1,4 @@
-use std::{fs::DirEntry, io};
+use std::io;
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
@@ -12,8 +12,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
+use tokio::fs::DirEntry;
 
-use crate::{state::InfoKind, Mode, State};
+use crate::{filesystem::read::File, state::InfoKind, Mode, State};
 
 pub mod input;
 mod utils;
@@ -55,7 +56,8 @@ impl UiState {
                     .files
                     .get(state.selected)
                     .expect("should be there")
-                    .path(),
+                    .path
+                    .clone(),
                 key_event.code,
             );
         }
@@ -104,7 +106,7 @@ impl UiState {
             .iter()
             .enumerate()
             .map(|(pos, file)| {
-                let text = file.file_name().into_string().map_err(|s| {
+                let text = file.name.clone().into_string().map_err(|s| {
                     eyre!(
                         "{UI_ERROR_WRAP}\nCould not convert filename {:?} to string",
                         s
@@ -130,8 +132,8 @@ impl UiState {
         Ok(())
     }
 
-    fn get_file_color(&mut self, file: &DirEntry) -> Result<Color> {
-        let kind = file.file_type()?;
+    fn get_file_color(&mut self, file: &File) -> Result<Color> {
+        let kind = file.file_type;
         if kind.is_dir() {
             return Ok(Color::Cyan);
         }
