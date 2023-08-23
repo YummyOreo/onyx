@@ -67,6 +67,7 @@ impl Info {
 #[derive(Default)]
 pub struct State {
     pub path: PathBuf,
+    pub last_path: PathBuf,
     pub files: Vec<File>,
     pub selected: usize,
     pub mode: Mode,

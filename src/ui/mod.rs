@@ -12,7 +12,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use tokio::fs::DirEntry;
 
 use crate::{filesystem::read::File, state::InfoKind, Mode, State};
 

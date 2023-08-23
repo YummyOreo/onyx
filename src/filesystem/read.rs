@@ -31,30 +31,28 @@ pub enum ReadRes {
 }
 
 pub async fn read_with_fallback(path: &PathBuf, fallback: PathBuf) -> Result<ReadRes> {
-    match fs::read_dir(path).await.wrap_err_with(|| {
-        format!(
+    if path.exists() {
+        Ok(ReadRes::Read(read_path(path).await?))
+    } else {
+        let r = eyre::eyre!(
             "Could not read path: \"{}\". Defaulting to \"./\"",
             path.to_str().unwrap()
-        )
-    }) {
-        Ok(mut t) => {
-            let mut files = vec![];
-            while let Some(d) = t.next_entry().await? {
-                files.push(File::new(d).await?);
-            }
-            Ok(ReadRes::Read(files))
-        }
-        Err(e) => {
-            let mut files = vec![];
-            while let Some(d) = fs::read_dir(&fallback)
-                .await
-                .wrap_err_with(|| format!("Could not read path: \"{}\"", path.to_str().unwrap()))?
-                .next_entry()
-                .await?
-            {
-                files.push(File::new(d).await?);
-            }
-            Ok(ReadRes::FallBack { error: e, files })
-        }
+        );
+        Ok(ReadRes::FallBack {
+            error: r,
+            files: read_path(&fallback).await?,
+        })
     }
+}
+
+pub async fn read_path(path: &PathBuf) -> Result<Vec<File>> {
+    let mut t = fs::read_dir(path)
+        .await
+        .wrap_err_with(|| format!("Could not read path: \"{}\".", path.to_str().unwrap()))?;
+
+    let mut files = vec![];
+    while let Some(d) = t.next_entry().await? {
+        files.push(File::new(d).await?);
+    }
+    Ok(files)
 }

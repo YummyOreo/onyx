@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
-use filesystem::read::{read_with_fallback, ReadRes};
+use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};
@@ -30,6 +30,7 @@ impl App {
             files,
             info: Vec::default(),
             path,
+            last_path: PathBuf::new(),
             ..Default::default()
         };
         Ok(Self {
@@ -43,16 +44,21 @@ impl App {
 
         loop {
             let state = &mut self.state;
-            state.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
-                ReadRes::Read(files) => files,
-                ReadRes::FallBack { error, files } => {
-                    state.path = PathBuf::from("./");
-                    state.info.push(Info::new(InfoKind::Error(error)));
-                    files
+            if state.last_path != state.path {
+                state.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
+                    ReadRes::Read(files) => files,
+                    ReadRes::FallBack { error, files } => {
+                        state.path = PathBuf::from("./");
+                        state.info.push(Info::new(InfoKind::Error(error)));
+                        files
+                    }
+                };
+                if !state.path.is_absolute() {
+                    state.path = state.path.canonicalize()?;
                 }
-            };
-            if !state.path.is_absolute() {
-                state.path = state.path.canonicalize()?;
+                state.last_path = state.path.clone()
+            } else {
+                state.files = read_path(&state.path).await?;
             }
 
             state.selected = state.selected.clamp(0, state.files.len() - 1);
@@ -112,22 +118,19 @@ impl App {
                 let mut mode = Mode::Basic;
                 core::mem::swap(&mut state.mode, &mut mode);
                 match mode {
-                    Mode::CreateFile(file) => match filesystem::modify::create_file(&file).await {
-                        Ok(_) => {}
-                        Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
-                    },
-                    Mode::RenameFile(from, new) => {
-                        match filesystem::modify::rename_file(&from, &new).await {
-                            Ok(_) => {}
-                            Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
+                    Mode::CreateFile(file) => {
+                        if let Err(e) = filesystem::modify::create_file(&file).await {
+                            state.info.push(Info::new(InfoKind::Error(e)));
                         }
                     }
-                    Mode::DeleteFile(file, confirm) => {
-                        if confirm.to_lowercase() == "y" {
-                            match filesystem::modify::delete_file(&file).await {
-                                Ok(_) => {}
-                                Err(e) => state.info.push(Info::new(InfoKind::Error(e))),
-                            }
+                    Mode::RenameFile(from, new) => {
+                        if let Err(e) = filesystem::modify::rename_file(&from, &new).await {
+                            state.info.push(Info::new(InfoKind::Error(e)));
+                        }
+                    }
+                    Mode::DeleteFile(file, confirm) if confirm.to_lowercase() == "y" => {
+                        if let Err(e) = filesystem::modify::delete_file(&file).await {
+                            state.info.push(Info::new(InfoKind::Error(e)));
                         }
                     }
                     _ => {}
