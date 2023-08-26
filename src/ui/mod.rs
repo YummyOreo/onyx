@@ -13,7 +13,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::{filesystem::read::File, state::InfoKind, Mode, State};
+use crate::{filesystem::read::File, state::InfoKind, Mode, State, main};
 
 pub mod input;
 mod utils;
@@ -60,6 +60,11 @@ impl UiState {
 
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, state: &State) {
         let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(0)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(f.size());
+        let left_layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(0)
             .constraints(
@@ -70,18 +75,19 @@ impl UiState {
                 ]
                 .as_ref(),
             )
-            .split(f.size());
+            .split(layout[0]);
 
         self.draw_path(
             f,
-            layout[0],
+            left_layout[0],
             state.path.to_str().wrap_err(UI_ERROR_WRAP).unwrap(),
         );
-        self.draw_files(f, layout[1], state)
+        self.draw_files(f, left_layout[1], state)
             .wrap_err(UI_ERROR_WRAP)
             .unwrap();
         self.draw_input(f, state);
-        self.draw_info(f, layout[2], state);
+        self.draw_info(f, left_layout[2], state);
+        self.draw_content(f, layout[1], state);
     }
 
     fn draw_path(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, path: &str) {
@@ -180,5 +186,10 @@ impl UiState {
         } else {
             // do something if there is nothing here
         }
+    }
+    fn draw_content(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, _state: &State) {
+        let border = Block::default().borders(Borders::LEFT);
+        let p = Paragraph::new("test").block(border);
+        f.render_widget(p, chunk)
     }
 }
