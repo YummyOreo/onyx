@@ -119,7 +119,7 @@ impl App {
                 core::mem::swap(&mut state.mode, &mut mode);
                 match mode {
                     Mode::CreateFile(file) => {
-                        if let Err(e) = filesystem::modify::create_file(&file).await {
+                        if let Err(e) = filesystem::modify::create_file(&file, &state.path).await {
                             state.info.push(Info::new(InfoKind::Error(e)));
                         }
                     }

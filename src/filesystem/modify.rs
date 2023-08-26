@@ -5,13 +5,13 @@ use tokio::fs;
 
 use super::utils;
 
-pub async fn create_file(file: &str) -> Result<()> {
+pub async fn create_file(file: &str, current_path: &PathBuf) -> Result<()> {
     match utils::get_type_by_name(file) {
         utils::FileType::Folder => {
-            fs::create_dir_all(PathBuf::from(file)).await?;
+            fs::create_dir_all(current_path.join(file)).await?;
         }
         utils::FileType::File(_) => {
-            fs::File::create(PathBuf::from(file)).await?;
+            fs::File::create(current_path.join(file)).await?;
         }
     }
     Ok(())
