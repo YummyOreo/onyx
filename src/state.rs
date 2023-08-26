@@ -1,10 +1,12 @@
 use std::{
-    fs::DirEntry,
     path::PathBuf,
     time::{Duration, Instant},
 };
 
 use eyre::Report;
+use tokio::fs::DirEntry;
+
+use crate::filesystem::read::File;
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
@@ -65,7 +67,8 @@ impl Info {
 #[derive(Default)]
 pub struct State {
     pub path: PathBuf,
-    pub files: Vec<DirEntry>,
+    pub last_path: PathBuf,
+    pub files: Vec<File>,
     pub selected: usize,
     pub mode: Mode,
     pub info: Vec<Info>,
