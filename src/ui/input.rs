@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 
 use crate::Mode;
 
-pub fn match_keycode(mode: &Mode, current_file: PathBuf, input: KeyCode) -> InputResult {
+pub fn match_keycode(mode: &Mode, current_file: Option<PathBuf>, input: KeyCode) -> InputResult {
     match input {
         KeyCode::Char(c) if mode != &Mode::Basic => InputResult::Mode(InputModeResult::AddChar(c)),
         KeyCode::Backspace if mode != &Mode::Basic => {
@@ -22,12 +22,16 @@ pub fn match_keycode(mode: &Mode, current_file: PathBuf, input: KeyCode) -> Inpu
         KeyCode::Char('c') => {
             InputResult::Mode(InputModeResult::ModeChange(Mode::CreateFile(String::new())))
         }
-        KeyCode::Char('r') => InputResult::Mode(InputModeResult::ModeChange(Mode::RenameFile(
-            current_file.clone(),
-            current_file.to_string_lossy().to_string(),
-        ))),
+        KeyCode::Char('r') | KeyCode::Char('d') if current_file.is_none() => InputResult::Skip,
+        KeyCode::Char('r') => {
+            let current_file = current_file.expect("should be there");
+            InputResult::Mode(InputModeResult::ModeChange(Mode::RenameFile(
+                current_file.clone(),
+                current_file.to_string_lossy().to_string(),
+            )))
+        }
         KeyCode::Char('d') => InputResult::Mode(InputModeResult::ModeChange(Mode::DeleteFile(
-            current_file,
+            current_file.expect("should be there"),
             String::new(),
         ))),
         _ => InputResult::Skip,
