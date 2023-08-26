@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
-use filesystem::read::{read_path, read_with_fallback, ReadRes};
+use filesystem::read::{read_path, read_with_fallback, File, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};
@@ -61,7 +61,7 @@ impl App {
                 state.files = read_path(&state.path).await?;
             }
 
-            state.selected = state.selected.clamp(0, state.files.len() - 1);
+            state.selected = state.selected.clamp(0, state.files.len().saturating_sub(1));
             terminal.draw(|f| self.ui.draw(f, state))?;
             State::purge_info(&mut state.info, Duration::from_secs(4)).await;
 
@@ -92,7 +92,7 @@ impl App {
                     .selected
                     .checked_add(1)
                     .unwrap()
-                    .clamp(0, state.files.len() - 1);
+                    .clamp(0, state.files.len().saturating_sub(1));
             }
             InputResult::EnterFolder => {
                 let folder = &state.files[state.selected];
@@ -119,7 +119,7 @@ impl App {
                 core::mem::swap(&mut state.mode, &mut mode);
                 match mode {
                     Mode::CreateFile(file) => {
-                        if let Err(e) = filesystem::modify::create_file(&file).await {
+                        if let Err(e) = filesystem::modify::create_file(&file, &state.path).await {
                             state.info.push(Info::new(InfoKind::Error(e)));
                         }
                     }

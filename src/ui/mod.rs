@@ -51,12 +51,7 @@ impl UiState {
             }
             return input::match_keycode(
                 &state.mode,
-                state
-                    .files
-                    .get(state.selected)
-                    .expect("should be there")
-                    .path
-                    .clone(),
+                state.files.get(state.selected).map(|f| f.path.clone()),
                 key_event.code,
             );
         }
@@ -100,7 +95,7 @@ impl UiState {
         chunk: Rect,
         state: &State,
     ) -> Result<()> {
-        let items = state
+        let mut items = state
             .files
             .iter()
             .enumerate()
@@ -124,6 +119,10 @@ impl UiState {
             .collect::<Result<Vec<ListItem>, eyre::Error>>()
             .wrap_err(UI_ERROR_WRAP)
             .unwrap();
+
+        if items.is_empty() {
+            items.push(ListItem::new("No Files").style(Style::default().fg(Color::Gray)));
+        }
 
         let list = List::new(items);
         self.scroll_state.select(Some(state.selected));
