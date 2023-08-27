@@ -1,4 +1,4 @@
-use std::io;
+use std::{fs, io};
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
@@ -9,11 +9,25 @@ use eyre::{eyre, Context, ContextCompat, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
+    text::{self, Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
+use syntect::{
+    easy::{HighlightFile, HighlightLines},
+    highlighting::ThemeSet,
+    parsing::SyntaxSet,
+    util::{as_24_bit_terminal_escaped, LinesWithEndings},
+};
 
-use crate::{filesystem::read::File, state::InfoKind, Mode, State, main};
+use crate::{
+    filesystem::{read::File, utils::FileType},
+    main,
+    state::InfoKind,
+    Mode, State,
+};
+
+use self::utils::convert_sytax_style;
 
 pub mod input;
 mod utils;
@@ -187,9 +201,41 @@ impl UiState {
             // do something if there is nothing here
         }
     }
-    fn draw_content(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, _state: &State) {
+    fn draw_content(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
         let border = Block::default().borders(Borders::LEFT);
-        let p = Paragraph::new("test").block(border);
+        let text = match state.files.get(state.selected).map(|f| f.file_type) {
+            Some(f) if f.is_dir() => vec![Line::from("folder")],
+            Some(f) if f.is_file() => {
+                let ps = SyntaxSet::load_defaults_newlines();
+                let ts = ThemeSet::load_defaults();
+                let file = &state.files.get(state.selected).unwrap();
+                let syntax = ps
+                    .find_syntax_by_extension(
+                        file.path.extension().unwrap_or_default().to_str().unwrap(),
+                    )
+                    .unwrap_or(ps.find_syntax_plain_text());
+
+                let mut h = HighlightLines::new(syntax, &ts.themes["Solarized (dark)"]);
+                let content = String::from_utf8(fs::read(&file.path).unwrap())
+                    .unwrap_or("Binary".to_string());
+                let mut lines: Vec<Line> = vec![];
+
+                for line in LinesWithEndings::from(&content) {
+                    let ranges: Vec<(syntect::highlighting::Style, &str)> =
+                        h.highlight_line(line, &ps).unwrap();
+                    let mut line = vec![];
+                    for (style, s) in ranges {
+                        line.push(Span::styled(s.to_string(), convert_sytax_style(style)));
+                    }
+                    lines.push(Line::from(line));
+                }
+                lines
+            }
+            Some(f) if f.is_symlink() => vec![Line::from("symlink")],
+            Some(_) => vec![Line::from("unknown")],
+            None => vec![Line::from("Empty")],
+        };
+        let p = Paragraph::new(text).block(border);
         f.render_widget(p, chunk)
     }
 }
