@@ -130,9 +130,9 @@ impl UiState {
                 let style = if pos == state.selected {
                     Style::default()
                         .fg(Color::Black)
-                        .bg(self.get_file_color(file)?)
+                        .bg(self.get_file_color(&file.file_type)?)
                 } else {
-                    Style::default().fg(self.get_file_color(file)?)
+                    Style::default().fg(self.get_file_color(&file.file_type)?)
                 };
                 Ok(ListItem::new(text).style(style))
             })
@@ -150,8 +150,7 @@ impl UiState {
         Ok(())
     }
 
-    fn get_file_color(&mut self, file: &File) -> Result<Color> {
-        let kind = file.file_type;
+    fn get_file_color(&self, kind: &std::fs::FileType) -> Result<Color> {
         if kind.is_dir() {
             return Ok(Color::Cyan);
         }
@@ -204,7 +203,31 @@ impl UiState {
     fn draw_content(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
         let border = Block::default().borders(Borders::LEFT);
         let text = match state.files.get(state.selected).map(|f| f.file_type) {
-            Some(f) if f.is_dir() => vec![Line::from("folder")],
+            Some(file) if file.is_dir() => {
+                let files = fs::read_dir(&state.files.get(state.selected).unwrap().path)
+                    .unwrap()
+                    .enumerate();
+
+                let mut lines: Vec<Line> = vec![];
+                for (i, file) in files {
+                    if i > chunk.height as usize + 1_usize {
+                        break;
+                    }
+                    let file = file.unwrap();
+                    lines.push(Line::from(Span::styled(
+                        file.file_name().to_string_lossy().to_string(),
+                        Style::default()
+                            .fg(self.get_file_color(&file.file_type().unwrap()).unwrap()),
+                    )))
+                }
+                if lines.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        "Empty",
+                        Style::default().fg(Color::Gray),
+                    )))
+                }
+                lines
+            }
             Some(f) if f.is_file() => {
                 let ps = SyntaxSet::load_defaults_newlines();
                 let ts = ThemeSet::load_defaults();
@@ -231,7 +254,21 @@ impl UiState {
                 }
                 lines
             }
-            Some(f) if f.is_symlink() => vec![Line::from("symlink")],
+            Some(f) if f.is_symlink() => {
+                let path = state
+                    .files
+                    .get(state.selected)
+                    .unwrap()
+                    .path
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string();
+                vec![Line::from(Span::styled(
+                    path,
+                    Style::default().fg(Color::LightBlue),
+                ))]
+            }
             Some(_) => vec![Line::from("unknown")],
             None => vec![Line::from("Empty")],
         };
