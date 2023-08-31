@@ -269,8 +269,14 @@ impl UiState {
                     Style::default().fg(Color::LightBlue),
                 ))]
             }
-            Some(_) => vec![Line::from("unknown")],
-            None => vec![Line::from("Empty")],
+            Some(_) => vec![Line::from(Span::styled(
+                "Unknown",
+                Style::default().fg(Color::Gray),
+            ))],
+            None => vec![Line::from(Span::styled(
+                "Empty",
+                Style::default().fg(Color::Gray),
+            ))],
         };
         let p = Paragraph::new(text).block(border);
         f.render_widget(p, chunk)

@@ -96,10 +96,12 @@ impl App {
             }
             InputResult::EnterFolder => {
                 let folder = &state.files[state.selected];
-                if folder.file_type.is_dir() {
-                    state.path = folder.path.canonicalize()?
+                if folder.file_type.is_dir()
+                    | (folder.file_type.is_symlink() && folder.path.canonicalize()?.is_dir())
+                {
+                    state.path = folder.path.clone();
+                    state.selected = 0;
                 }
-                state.selected = 0;
             }
             InputResult::GoBack => {
                 state.path.pop();
