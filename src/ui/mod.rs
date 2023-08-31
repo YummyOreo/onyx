@@ -17,7 +17,7 @@ use syntect::{
     easy::HighlightLines,
     highlighting::ThemeSet,
     parsing::SyntaxSet,
-    util::{as_24_bit_terminal_escaped, LinesWithEndings},
+    util::LinesWithEndings,
 };
 
 use crate::{state::InfoKind, Mode, State};

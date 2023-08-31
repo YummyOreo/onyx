@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
-use filesystem::read::{read_path, read_with_fallback, File, ReadRes};
+use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};

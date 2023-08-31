@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use eyre::Result;
 use tokio::fs;
 
 use super::utils;
 
-pub async fn create_file(file: &str, current_path: &PathBuf) -> Result<()> {
+pub async fn create_file(file: &str, current_path: &Path) -> Result<()> {
     match utils::get_type_by_name(file) {
         utils::FileType::Folder => {
             fs::create_dir_all(current_path.join(file)).await?;
@@ -17,12 +17,12 @@ pub async fn create_file(file: &str, current_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub async fn rename_file(original: &PathBuf, new: &str) -> Result<()> {
+pub async fn rename_file(original: &Path, new: &str) -> Result<()> {
     fs::rename(original, PathBuf::from(new)).await?;
     Ok(())
 }
 
-pub async fn delete_file(file: &PathBuf) -> Result<()> {
+pub async fn delete_file(file: &Path) -> Result<()> {
     match utils::get_type_by_path(file) {
         utils::FileType::Folder => {
             fs::remove_dir_all(file).await?;

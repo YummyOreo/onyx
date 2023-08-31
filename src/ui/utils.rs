@@ -1,5 +1,4 @@
 use ratatui::prelude::*;
-use syntect::highlighting::FontStyle;
 
 pub fn centered_rect(percent_x: u16, size_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
