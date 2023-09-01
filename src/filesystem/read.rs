@@ -23,6 +23,15 @@ impl File {
             metadata: d.metadata().await?,
         })
     }
+
+    pub fn is_dir(&self) -> Result<bool> {
+        Ok(self.file_type.is_dir()
+            | (self.file_type.is_symlink() && self.path.canonicalize()?.is_dir()))
+    }
+    pub fn is_file(&self) -> Result<bool> {
+        Ok(self.file_type.is_file()
+            | (self.file_type.is_symlink() && self.path.canonicalize()?.is_file()))
+    }
 }
 
 pub enum ReadRes {

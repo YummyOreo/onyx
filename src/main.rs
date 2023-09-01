@@ -2,7 +2,7 @@ use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
-use filesystem::read::{read_path, read_with_fallback, File, ReadRes};
+use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
 use state::{Info, InfoKind, Mode, State};
@@ -96,10 +96,10 @@ impl App {
             }
             InputResult::EnterFolder => {
                 let folder = &state.files[state.selected];
-                if folder.file_type.is_dir() {
-                    state.path = folder.path.canonicalize()?
+                if folder.is_dir()? {
+                    state.path = folder.path.clone();
+                    state.selected = 0;
                 }
-                state.selected = 0;
             }
             InputResult::GoBack => {
                 state.path.pop();
