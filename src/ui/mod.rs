@@ -14,10 +14,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use syntect::{
-    easy::HighlightLines,
-    highlighting::ThemeSet,
-    parsing::SyntaxSet,
-    util::LinesWithEndings,
+    easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet, util::LinesWithEndings,
 };
 
 use crate::{state::InfoKind, Mode, State};
@@ -198,13 +195,8 @@ impl UiState {
     fn draw_content(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
         let border = Block::default().borders(Borders::LEFT);
         let text = match state.files.get(state.selected) {
-            Some(file)
-                if file.file_type.is_dir() | file.file_type.is_symlink()
-                    && file.path.canonicalize().unwrap().is_dir() =>
-            {
-                let files = fs::read_dir(&state.files.get(state.selected).unwrap().path)
-                    .unwrap()
-                    .enumerate();
+            Some(file) if file.is_dir().unwrap() => {
+                let files = fs::read_dir(&file.path).unwrap().enumerate();
 
                 let mut lines: Vec<Line> = vec![];
                 for (i, file) in files {
@@ -226,13 +218,9 @@ impl UiState {
                 }
                 lines
             }
-            Some(f)
-                if f.file_type.is_file() | f.file_type.is_symlink()
-                    && f.path.canonicalize().unwrap().is_file() =>
-            {
+            Some(file) if file.is_file().unwrap() => {
                 let ps = SyntaxSet::load_defaults_newlines();
                 let ts = ThemeSet::load_defaults();
-                let file = &state.files.get(state.selected).unwrap();
                 let syntax = ps
                     .find_syntax_by_extension(
                         file.path.extension().unwrap_or_default().to_str().unwrap(),
@@ -255,11 +243,8 @@ impl UiState {
                 }
                 lines
             }
-            Some(f) if f.file_type.is_symlink() => {
-                let path = state
-                    .files
-                    .get(state.selected)
-                    .unwrap()
+            Some(file) if file.file_type.is_symlink() => {
+                let path = file
                     .path
                     .canonicalize()
                     .unwrap()

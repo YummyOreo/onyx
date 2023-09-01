@@ -96,9 +96,7 @@ impl App {
             }
             InputResult::EnterFolder => {
                 let folder = &state.files[state.selected];
-                if folder.file_type.is_dir()
-                    | (folder.file_type.is_symlink() && folder.path.canonicalize()?.is_dir())
-                {
+                if folder.is_dir()? {
                     state.path = folder.path.clone();
                     state.selected = 0;
                 }

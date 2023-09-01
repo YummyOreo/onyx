@@ -28,7 +28,6 @@ pub fn centered_rect(percent_x: u16, size_y: u16, r: Rect) -> Rect {
 
 pub fn convert_sytax_style(s_style: syntect::highlighting::Style) -> Style {
     let mut style = Style::default();
-    // println!("{:?}", s_style);
     style = style.fg(Color::Rgb(
         s_style.foreground.r,
         s_style.foreground.g,
