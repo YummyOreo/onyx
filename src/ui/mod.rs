@@ -1,5 +1,6 @@
-use std::{fs, io};
+use std::io;
 
+use crate::{state::InfoKind, Mode, State};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
@@ -9,20 +10,9 @@ use eyre::{eyre, Context, ContextCompat, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
-    text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use syntect::{
-    easy::HighlightLines,
-    highlighting::{Theme, ThemeSet},
-    parsing::SyntaxSet,
-    util::LinesWithEndings,
-};
-
-use crate::{state::InfoKind, Mode, State};
-
-use self::utils::convert_sytax_style;
 
 pub mod input;
 mod side_panel;
