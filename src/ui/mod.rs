@@ -14,7 +14,10 @@ use ratatui::{
     Frame, Terminal,
 };
 use syntect::{
-    easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet, util::LinesWithEndings,
+    easy::HighlightLines,
+    highlighting::{Theme, ThemeSet},
+    parsing::SyntaxSet,
+    util::LinesWithEndings,
 };
 
 use crate::{state::InfoKind, Mode, State};
@@ -220,14 +223,14 @@ impl UiState {
             }
             Some(file) if file.is_file().unwrap() => {
                 let ps = SyntaxSet::load_defaults_newlines();
-                let ts = ThemeSet::load_defaults();
                 let syntax = ps
                     .find_syntax_by_extension(
                         file.path.extension().unwrap_or_default().to_str().unwrap(),
                     )
                     .unwrap_or(ps.find_syntax_plain_text());
 
-                let mut h = HighlightLines::new(syntax, &ts.themes["Solarized (dark)"]);
+                let theme = ThemeSet::load_defaults().themes["Solarized (dark)"].clone();
+                let mut h = HighlightLines::new(syntax, &theme);
                 let content = String::from_utf8(fs::read(&file.path).unwrap())
                     .unwrap_or("Binary".to_string());
                 let mut lines: Vec<Line> = vec![];

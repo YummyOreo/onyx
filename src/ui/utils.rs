@@ -33,10 +33,5 @@ pub fn convert_sytax_style(s_style: syntect::highlighting::Style) -> Style {
         s_style.foreground.g,
         s_style.foreground.b,
     ));
-    style = style.bg(Color::Rgb(
-        s_style.background.r,
-        s_style.background.g,
-        s_style.background.b,
-    ));
     style
 }
