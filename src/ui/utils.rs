@@ -1,3 +1,4 @@
+use eyre::{eyre, Result};
 use ratatui::prelude::*;
 
 pub fn centered_rect(percent_x: u16, size_y: u16, r: Rect) -> Rect {
@@ -24,6 +25,19 @@ pub fn centered_rect(percent_x: u16, size_y: u16, r: Rect) -> Rect {
             .as_ref(),
         )
         .split(popup_layout[1])[1]
+}
+
+pub fn get_file_color(kind: &std::fs::FileType) -> Result<Color> {
+    if kind.is_dir() {
+        return Ok(Color::Cyan);
+    }
+    if kind.is_file() {
+        return Ok(Color::White);
+    }
+    if kind.is_symlink() {
+        return Ok(Color::Green);
+    }
+    Err(eyre!("unreachable"))
 }
 
 pub fn convert_sytax_style(s_style: syntect::highlighting::Style) -> Style {
