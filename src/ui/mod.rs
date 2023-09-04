@@ -14,6 +14,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
+mod info_line;
 pub mod input;
 mod side_panel;
 mod utils;
@@ -59,22 +60,20 @@ impl UiState {
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, state: &State) {
+        let info_line_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(0)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(f.size());
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .margin(0)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(f.size());
+            .split(info_line_layout[0]);
         let left_layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(0)
-            .constraints(
-                [
-                    Constraint::Length(1),
-                    Constraint::Min(0),
-                    Constraint::Length(1),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Length(1), Constraint::Min(0)].as_ref())
             .split(layout[0]);
 
         self.draw_path(
@@ -85,7 +84,7 @@ impl UiState {
         self.draw_files(f, left_layout[1], state)
             .wrap_err(UI_ERROR_WRAP)
             .unwrap();
-        self.draw_info(f, left_layout[2], state);
+        info_line::render_info_line(f, info_line_layout[1], state);
         side_panel::draw_side_panel(f, layout[1], state);
         self.draw_input(f, state);
     }
@@ -150,27 +149,6 @@ impl UiState {
             let area = utils::centered_rect(60, 3, f.size());
             f.render_widget(Clear, area); //this clears out the background
             f.render_widget(p, area);
-        }
-    }
-
-    fn draw_info(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
-        if let Some(i) = state.info.last() {
-            let p = match &i.kind {
-                InfoKind::Error(r) => Paragraph::new(
-                    format!("{r}")
-                        .split('\n')
-                        .peekable()
-                        .next()
-                        .wrap_err(UI_ERROR_WRAP)
-                        .unwrap()
-                        .to_string(),
-                )
-                .style(Style::default().bg(Color::Red)),
-                InfoKind::Message(s) => Paragraph::new(s.to_string()),
-            };
-            f.render_widget(p, chunk)
-        } else {
-            // do something if there is nothing here
         }
     }
 }
