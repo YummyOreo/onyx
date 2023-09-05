@@ -1,4 +1,3 @@
-use eyre::{eyre, Result};
 use ratatui::prelude::*;
 
 pub fn centered_rect(percent_x: u16, size_y: u16, r: Rect) -> Rect {

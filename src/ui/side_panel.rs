@@ -35,26 +35,34 @@ pub fn draw_side_panel(f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &Sta
 }
 
 fn render_dir<'a>(file: &'a File, chunk: &'a Rect) -> Vec<Line<'a>> {
-    let files = fs::read_dir(&file.path).unwrap().enumerate();
+    match fs::read_dir(&file.path) {
+        Ok(r) => {
+            let files = r.enumerate();
 
-    let mut lines: Vec<Line> = vec![];
-    for (i, file) in files {
-        if i > chunk.height as usize + 1_usize {
-            break;
+            let mut lines: Vec<Line> = vec![];
+            for (i, file) in files {
+                if i > chunk.height as usize + 1_usize {
+                    break;
+                }
+                let file = file.unwrap();
+                lines.push(Line::from(Span::styled(
+                    file.file_name().to_string_lossy().to_string(),
+                    Style::default().fg(utils::get_file_color(&file.file_type().unwrap())),
+                )))
+            }
+            if lines.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "Empty",
+                    Style::default().fg(Color::Gray),
+                )))
+            }
+            lines
         }
-        let file = file.unwrap();
-        lines.push(Line::from(Span::styled(
-            file.file_name().to_string_lossy().to_string(),
-            Style::default().fg(utils::get_file_color(&file.file_type().unwrap())),
-        )))
+        Err(e) => vec![Line::from(Span::styled(
+            format!("{e}"),
+            Style::default().fg(Color::Red),
+        ))],
     }
-    if lines.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "Empty",
-            Style::default().fg(Color::Gray),
-        )))
-    }
-    lines
 }
 
 fn render_files(file: &File) -> Vec<Line> {
