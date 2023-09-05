@@ -115,9 +115,9 @@ impl UiState {
                 let style = if pos == state.selected {
                     Style::default()
                         .fg(Color::Black)
-                        .bg(utils::get_file_color(&file.file_type)?)
+                        .bg(utils::get_file_color(&file.file_type))
                 } else {
-                    Style::default().fg(utils::get_file_color(&file.file_type)?)
+                    Style::default().fg(utils::get_file_color(&file.file_type))
                 };
                 Ok(ListItem::new(text).style(style))
             })

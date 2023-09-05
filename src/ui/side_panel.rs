@@ -45,7 +45,7 @@ fn render_dir<'a>(file: &'a File, chunk: &'a Rect) -> Vec<Line<'a>> {
         let file = file.unwrap();
         lines.push(Line::from(Span::styled(
             file.file_name().to_string_lossy().to_string(),
-            Style::default().fg(utils::get_file_color(&file.file_type().unwrap()).unwrap()),
+            Style::default().fg(utils::get_file_color(&file.file_type().unwrap())),
         )))
     }
     if lines.is_empty() {
