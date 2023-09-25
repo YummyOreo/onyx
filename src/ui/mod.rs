@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{state::InfoKind, Mode, State};
+use crate::{state::InfoKind, State};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
@@ -51,7 +51,6 @@ impl UiState {
                 return input::InputResult::Skip;
             }
             return input::match_keycode(
-                &state.mode,
                 state.files.get(state.selected).map(|f| f.path.clone()),
                 key_event.code,
             );
@@ -86,7 +85,6 @@ impl UiState {
             .unwrap();
         info_line::render_info_line(f, info_line_layout[1], state);
         side_panel::draw_side_panel(f, layout[1], state);
-        self.draw_input(f, state);
     }
 
     fn draw_path(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, path: &str) {
@@ -133,22 +131,5 @@ impl UiState {
         self.scroll_state.select(Some(state.selected));
         f.render_stateful_widget(list, chunk, &mut self.scroll_state);
         Ok(())
-    }
-
-    fn draw_input(&self, f: &mut Frame<'_, impl Backend>, state: &State) {
-        if state.mode != Mode::Basic {
-            let title = match &state.mode {
-                Mode::Basic => "",
-                Mode::CreateFile(_) => "Create File",
-                Mode::RenameFile(_, _) => "Renaming file",
-                Mode::DeleteFile(_, _) => "Deleting file",
-            };
-
-            let block = Block::default().title(title).borders(Borders::ALL);
-            let p = Paragraph::new(state.mode.get_str().unwrap_or("")).block(block);
-            let area = utils::centered_rect(60, 3, f.size());
-            f.render_widget(Clear, area); //this clears out the background
-            f.render_widget(p, area);
-        }
     }
 }

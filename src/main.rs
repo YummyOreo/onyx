@@ -5,9 +5,9 @@ use eyre::Result;
 use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
-use state::{Info, InfoKind, Mode, State};
+use state::{Info, InfoKind, State};
 
-use crate::ui::input::{InputModeResult, InputResult};
+use crate::ui::input::InputResult;
 
 mod filesystem;
 mod settings;
@@ -104,37 +104,6 @@ impl App {
             InputResult::GoBack => {
                 state.path.pop();
                 state.selected = 0;
-            }
-            InputResult::Mode(InputModeResult::ModeChange(m)) => {
-                state.mode = m;
-            }
-            InputResult::Mode(InputModeResult::AddChar(c)) => {
-                state.mode.add_char(c);
-            }
-            InputResult::Mode(InputModeResult::RemoveChar) => {
-                state.mode.remove_char();
-            }
-            InputResult::Mode(InputModeResult::Execute) => {
-                let mut mode = Mode::Basic;
-                core::mem::swap(&mut state.mode, &mut mode);
-                match mode {
-                    Mode::CreateFile(file) => {
-                        if let Err(e) = filesystem::modify::create_file(&file, &state.path).await {
-                            state.info.push(Info::new(InfoKind::Error(e)));
-                        }
-                    }
-                    Mode::RenameFile(from, new) => {
-                        if let Err(e) = filesystem::modify::rename_file(&from, &new).await {
-                            state.info.push(Info::new(InfoKind::Error(e)));
-                        }
-                    }
-                    Mode::DeleteFile(file, confirm) if confirm.to_lowercase() == "y" => {
-                        if let Err(e) = filesystem::modify::delete_file(&file).await {
-                            state.info.push(Info::new(InfoKind::Error(e)));
-                        }
-                    }
-                    _ => {}
-                };
             }
             _ => {}
         }
