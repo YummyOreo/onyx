@@ -51,7 +51,7 @@ impl UiState {
                 return input::InputResult::Skip;
             }
             return input::match_keycode(
-                state.files.get(state.selected).map(|f| f.path.clone()),
+                &state.mode,
                 key_event.code,
             );
         }
