@@ -4,8 +4,11 @@ use std::{
 };
 
 use eyre::Report;
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 use crate::filesystem::read::File;
+
+type GetScoreFn = dyn Fn(&str, &File) -> Option<(i64, Vec<usize>)>;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mode {
@@ -55,6 +58,38 @@ impl Info {
             time: Instant::now(),
         }
     }
+}
+
+pub enum SortMode {
+    Default,
+    Fuzzy,
+}
+
+impl Default for SortMode {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl SortMode {
+    pub fn get_score_fn(&self) -> Option<Box<GetScoreFn>> {
+        match self {
+            Self::Default => None,
+            Self::Fuzzy => {
+                let matcher = SkimMatcherV2::default();
+                Some(Box::new(move |pattern, file| {
+                    matcher.fuzzy_indices(&file.name.to_string_lossy(), pattern)
+                }))
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Files<'a> {
+    pub files: Vec<File>,
+    pub sort_mode: SortMode,
+    pub input: Option<&'a str>,
 }
 
 #[derive(Default)]
