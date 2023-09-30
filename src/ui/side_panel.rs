@@ -17,7 +17,7 @@ use super::utils::{self, convert_sytax_style};
 
 pub fn draw_side_panel(f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
     let border = Block::default().borders(Borders::LEFT);
-    let text = match state.files.get(state.selected) {
+    let text = match state.files.files.get(state.selected) {
         Some(file) if file.is_dir().unwrap() => render_dir(file, &chunk),
         Some(file) if file.is_file().unwrap() => render_files(file),
         Some(file) if file.file_type.is_symlink() => render_symlink(file),

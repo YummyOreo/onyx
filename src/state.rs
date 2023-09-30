@@ -89,20 +89,39 @@ impl SortMode {
 pub struct Files<'a> {
     pub files: Vec<File>,
     pub sort_mode: SortMode,
-    pub input: Option<&'a str>,
+    pub input: &'a str,
+}
+
+impl<'a> Files<'a> {
+    pub fn new(files: Vec<File>) -> Self {
+        Self {
+            files,
+            ..Default::default()
+        }
+    }
+    pub fn sort(&mut self) -> Option<()> {
+        let f = self.sort_mode.get_score_fn()?;
+        self.files.sort_by(|a, b| {
+            f(self.input, a)
+                .unwrap()
+                .0
+                .cmp(&f(self.input, b).unwrap().0)
+        });
+        Some(())
+    }
 }
 
 #[derive(Default)]
-pub struct State {
+pub struct State<'a> {
     pub path: PathBuf,
     pub last_path: PathBuf,
-    pub files: Vec<File>,
+    pub files: Files<'a>,
     pub selected: usize,
     pub info: Vec<Info>,
     pub mode: Mode,
 }
 
-impl State {
+impl<'a> State<'a> {
     pub async fn purge_info(infos: &mut Vec<Info>, d: Duration) {
         infos.retain(|i| i.time.elapsed() < d);
     }

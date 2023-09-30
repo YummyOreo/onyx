@@ -5,7 +5,7 @@ use eyre::Result;
 use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
-use state::{Info, InfoKind, State};
+use state::{Files, Info, InfoKind, State};
 
 use crate::ui::input::InputResult;
 
@@ -14,12 +14,12 @@ mod settings;
 mod state;
 mod ui;
 
-pub struct App {
+pub struct App<'a> {
     pub ui: ui::UiState,
-    pub state: State,
+    pub state: State<'a>,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new(path: PathBuf) -> Result<Self> {
         let files = Vec::default();
         let ui_state = ui::UiState {
@@ -27,7 +27,7 @@ impl App {
         };
 
         let state = State {
-            files,
+            files: Files::new(files),
             info: Vec::default(),
             path,
             last_path: PathBuf::new(),
@@ -45,7 +45,7 @@ impl App {
         loop {
             let state = &mut self.state;
             if state.last_path != state.path {
-                state.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
+                state.files.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
                     ReadRes::Read(files) => files,
                     ReadRes::FallBack { error, files } => {
                         state.path = PathBuf::from("./");
@@ -58,10 +58,10 @@ impl App {
                 }
                 state.last_path = state.path.clone()
             } else {
-                state.files = read_path(&state.path).await?;
+                state.files.files = read_path(&state.path).await?;
             }
 
-            state.selected = state.selected.clamp(0, state.files.len().saturating_sub(1));
+            state.selected = state.selected.clamp(0, state.files.files.len().saturating_sub(1));
             terminal.draw(|f| self.ui.draw(f, state))?;
             State::purge_info(&mut state.info, Duration::from_secs(4)).await;
 
@@ -79,7 +79,7 @@ impl App {
         ui::restore_terminal(terminal)
     }
 
-    async fn handle_input(input: InputResult, state: &mut State) -> Result<bool> {
+    async fn handle_input(input: InputResult, state: &mut State<'a>) -> Result<bool> {
         match input {
             InputResult::Quit => {
                 return Ok(true);
@@ -92,10 +92,10 @@ impl App {
                     .selected
                     .checked_add(1)
                     .unwrap()
-                    .clamp(0, state.files.len().saturating_sub(1));
+                    .clamp(0, state.files.files.len().saturating_sub(1));
             }
             InputResult::EnterFolder => {
-                let folder = &state.files[state.selected];
+                let folder = &state.files.files[state.selected];
                 if folder.is_dir()? {
                     state.path = folder.path.clone();
                     state.selected = 0;

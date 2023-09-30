@@ -45,15 +45,12 @@ pub struct UiState {
 }
 
 impl UiState {
-    pub async fn input(&self, input: Event, state: &State) -> input::InputResult {
+    pub async fn input<'a>(&self, input: Event, state: &State<'a>) -> input::InputResult {
         if let Event::Key(key_event) = input {
             if key_event.kind == KeyEventKind::Release {
                 return input::InputResult::Skip;
             }
-            return input::match_keycode(
-                &state.mode,
-                key_event.code,
-            );
+            return input::match_keycode(&state.mode, key_event.code);
         }
         input::InputResult::Skip
     }
@@ -99,6 +96,7 @@ impl UiState {
         state: &State,
     ) -> Result<()> {
         let mut items = state
+            .files
             .files
             .iter()
             .enumerate()
