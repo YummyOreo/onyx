@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crossterm::event::KeyCode;
 
 use crate::state::Mode;
@@ -12,7 +14,10 @@ pub fn match_keycode(mode: &Mode, input: KeyCode) -> InputResult {
         KeyCode::Down | KeyCode::Char('j') => InputResult::MoveDown,
         KeyCode::Left | KeyCode::Char('h') => InputResult::GoBack,
         KeyCode::Right | KeyCode::Char('l') => InputResult::EnterFolder,
-        KeyCode::Char('/') => InputResult::ModeChange(Mode::Search(String::new())),
+        KeyCode::Char('/') => {
+            InputResult::ModeChange(Mode::Search(Rc::new(RefCell::new(String::new()))))
+        }
+        KeyCode::Esc if matches!(mode, &Mode::Search(_)) => InputResult::ModeChange(Mode::Basic),
         KeyCode::Char('q') => InputResult::Quit,
         _ => InputResult::Skip,
     }

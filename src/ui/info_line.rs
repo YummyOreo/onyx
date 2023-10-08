@@ -1,4 +1,4 @@
-use crate::state::{InfoKind, State};
+use crate::state::{InfoKind, Mode, State};
 use eyre::ContextCompat;
 use ratatui::{
     prelude::{Backend, Rect},
@@ -10,6 +10,11 @@ use ratatui::{
 use super::UI_ERROR_WRAP;
 
 pub fn render_info_line(f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
+    if matches!(state.mode, Mode::Search(_)) {
+        let p = Paragraph::new(state.mode.get().unwrap_or_default());
+        f.render_widget(p, chunk);
+        return;
+    }
     if let Some(i) = state.info.last() {
         let p = match &i.kind {
             InfoKind::Error(r) => Paragraph::new(

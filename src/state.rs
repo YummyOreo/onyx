@@ -1,5 +1,8 @@
 use std::{
+    borrow::BorrowMut,
+    cell::RefCell,
     path::PathBuf,
+    rc::Rc,
     time::{Duration, Instant},
 };
 
@@ -13,7 +16,7 @@ type GetScoreFn = dyn Fn(&str, &File) -> Option<(i64, Vec<usize>)>;
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mode {
     Basic,
-    Search(String),
+    Search(Rc<RefCell<String>>),
 }
 
 impl Default for Mode {
@@ -23,20 +26,26 @@ impl Default for Mode {
 }
 
 impl Mode {
-    pub fn get(&self) -> Option<&str> {
+    pub fn get(&self) -> Option<String> {
         match &self {
-            Self::Search(s) => Some(s),
+            Self::Search(s) => Some(s.borrow().clone()),
             _ => None,
         }
     }
     pub fn push(&mut self, c: char) {
         if let Self::Search(s) = self {
-            s.push(c);
+            s.borrow_mut().replace_with(|s| {
+                s.push(c);
+                s.to_string()
+            });
         }
     }
     pub fn pop(&mut self) {
         if let Self::Search(s) = self {
-            s.pop();
+            s.borrow_mut().replace_with(|s| {
+                s.pop();
+                s.to_string()
+            });
         }
     }
 }
@@ -86,13 +95,13 @@ impl SortMode {
 }
 
 #[derive(Default)]
-pub struct Files<'a> {
+pub struct Files {
     pub files: Vec<File>,
     pub sort_mode: SortMode,
-    pub input: &'a str,
+    pub input: Rc<RefCell<String>>,
 }
 
-impl<'a> Files<'a> {
+impl Files {
     pub fn new(files: Vec<File>) -> Self {
         Self {
             files,
@@ -102,26 +111,27 @@ impl<'a> Files<'a> {
     pub fn sort(&mut self) -> Option<()> {
         let f = self.sort_mode.get_score_fn()?;
         self.files.sort_by(|a, b| {
-            f(self.input, a)
-                .unwrap()
+            f(&self.input.borrow(), a)
+                .unwrap_or_default()
                 .0
-                .cmp(&f(self.input, b).unwrap().0)
+                .cmp(&f(&self.input.borrow(), b).unwrap_or_default().0)
         });
+        self.files.reverse();
         Some(())
     }
 }
 
 #[derive(Default)]
-pub struct State<'a> {
+pub struct State {
     pub path: PathBuf,
     pub last_path: PathBuf,
-    pub files: Files<'a>,
+    pub files: Files,
     pub selected: usize,
     pub info: Vec<Info>,
     pub mode: Mode,
 }
 
-impl<'a> State<'a> {
+impl State {
     pub async fn purge_info(infos: &mut Vec<Info>, d: Duration) {
         infos.retain(|i| i.time.elapsed() < d);
     }

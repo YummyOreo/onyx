@@ -1,11 +1,12 @@
-use std::{path::PathBuf, time::Duration};
+use std::{clone, path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
 use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
-use state::{Files, Info, InfoKind, State};
+use state::{Files, Info, InfoKind, Mode, SortMode, State};
+use ui::input::ModifyMode;
 
 use crate::ui::input::InputResult;
 
@@ -14,12 +15,12 @@ mod settings;
 mod state;
 mod ui;
 
-pub struct App<'a> {
+pub struct App {
     pub ui: ui::UiState,
-    pub state: State<'a>,
+    pub state: State,
 }
 
-impl<'a> App<'a> {
+impl App {
     pub fn new(path: PathBuf) -> Result<Self> {
         let files = Vec::default();
         let ui_state = ui::UiState {
@@ -45,14 +46,15 @@ impl<'a> App<'a> {
         loop {
             let state = &mut self.state;
             if state.last_path != state.path {
-                state.files.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
-                    ReadRes::Read(files) => files,
-                    ReadRes::FallBack { error, files } => {
-                        state.path = PathBuf::from("./");
-                        state.info.push(Info::new(InfoKind::Error(error)));
-                        files
-                    }
-                };
+                state.files.files =
+                    match read_with_fallback(&state.path, PathBuf::from("./")).await? {
+                        ReadRes::Read(files) => files,
+                        ReadRes::FallBack { error, files } => {
+                            state.path = PathBuf::from("./");
+                            state.info.push(Info::new(InfoKind::Error(error)));
+                            files
+                        }
+                    };
                 if !state.path.is_absolute() {
                     state.path = state.path.canonicalize()?;
                 }
@@ -60,8 +62,11 @@ impl<'a> App<'a> {
             } else {
                 state.files.files = read_path(&state.path).await?;
             }
+            state.files.sort();
 
-            state.selected = state.selected.clamp(0, state.files.files.len().saturating_sub(1));
+            state.selected = state
+                .selected
+                .clamp(0, state.files.files.len().saturating_sub(1));
             terminal.draw(|f| self.ui.draw(f, state))?;
             State::purge_info(&mut state.info, Duration::from_secs(4)).await;
 
@@ -79,7 +84,7 @@ impl<'a> App<'a> {
         ui::restore_terminal(terminal)
     }
 
-    async fn handle_input(input: InputResult, state: &mut State<'a>) -> Result<bool> {
+    async fn handle_input(input: InputResult, state: &mut State) -> Result<bool> {
         match input {
             InputResult::Quit => {
                 return Ok(true);
@@ -104,6 +109,21 @@ impl<'a> App<'a> {
             InputResult::GoBack => {
                 state.path.pop();
                 state.selected = 0;
+            }
+            InputResult::ModifyMode(ModifyMode::PopChar) => state.mode.pop(),
+            InputResult::ModifyMode(ModifyMode::PushChar(c)) => state.mode.push(c),
+            InputResult::ModeChange(m) if matches!(m, Mode::Search(_)) => {
+                state.mode = m;
+                state.files.sort_mode = SortMode::Fuzzy;
+                state.files.input = match &state.mode {
+                    Mode::Search(c) => c.clone(),
+                    _ => unreachable!(),
+                };
+            }
+            InputResult::ModeChange(Mode::Basic) => {
+                state.mode = Mode::Basic;
+                state.files.input = Default::default();
+                state.files.sort_mode = SortMode::Default;
             }
             _ => {}
         }

@@ -45,7 +45,7 @@ pub struct UiState {
 }
 
 impl UiState {
-    pub async fn input<'a>(&self, input: Event, state: &State<'a>) -> input::InputResult {
+    pub async fn input(&self, input: Event, state: &State) -> input::InputResult {
         if let Event::Key(key_event) = input {
             if key_event.kind == KeyEventKind::Release {
                 return input::InputResult::Skip;
