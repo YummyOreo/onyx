@@ -135,4 +135,18 @@ impl State {
     pub async fn purge_info(infos: &mut Vec<Info>, d: Duration) {
         infos.retain(|i| i.time.elapsed() < d);
     }
+
+    pub fn change_sort_mode(&mut self, mode: Mode, search_mode: SortMode) {
+        self.mode = mode;
+        match &self.mode {
+            Mode::Basic => {
+                self.files.input = Default::default();
+                self.files.sort_mode = SortMode::Default;
+            }
+            Mode::Search(s) => {
+                self.files.sort_mode = search_mode;
+                self.files.input = s.clone();
+            }
+        }
+    }
 }

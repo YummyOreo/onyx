@@ -1,11 +1,11 @@
-use std::{clone, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use crossterm::event;
 use eyre::Result;
 use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
-use state::{Files, Info, InfoKind, Mode, SortMode, State};
+use state::{Files, Info, InfoKind, SortMode, State};
 use ui::input::ModifyMode;
 
 use crate::ui::input::InputResult;
@@ -112,19 +112,7 @@ impl App {
             }
             InputResult::ModifyMode(ModifyMode::PopChar) => state.mode.pop(),
             InputResult::ModifyMode(ModifyMode::PushChar(c)) => state.mode.push(c),
-            InputResult::ModeChange(m) if matches!(m, Mode::Search(_)) => {
-                state.mode = m;
-                state.files.sort_mode = SortMode::Fuzzy;
-                state.files.input = match &state.mode {
-                    Mode::Search(c) => c.clone(),
-                    _ => unreachable!(),
-                };
-            }
-            InputResult::ModeChange(Mode::Basic) => {
-                state.mode = Mode::Basic;
-                state.files.input = Default::default();
-                state.files.sort_mode = SortMode::Default;
-            }
+            InputResult::ModeChange(m) => state.change_sort_mode(m, SortMode::Fuzzy),
             _ => {}
         }
         Ok(false)
