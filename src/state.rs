@@ -144,7 +144,7 @@ impl State {
                 self.files.input = Default::default();
                 self.files.sort_mode = SortMode::Default;
             }
-            Mode::EscapedSearch => {},
+            Mode::EscapedSearch => {}
             Mode::Search(s) => {
                 self.files.sort_mode = search_mode;
                 self.files.input = s.clone();
