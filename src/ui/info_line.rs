@@ -10,8 +10,8 @@ use ratatui::{
 use super::UI_ERROR_WRAP;
 
 pub fn render_info_line(f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
-    if matches!(state.mode, Mode::Search(_)) {
-        let p = Paragraph::new(state.mode.get().unwrap_or_default());
+    if matches!(state.mode, Mode::Search(_) | Mode::EscapedSearch) {
+        let p = Paragraph::new(state.files.input.borrow().to_string());
         f.render_widget(p, chunk);
         return;
     }

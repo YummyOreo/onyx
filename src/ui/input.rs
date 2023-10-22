@@ -6,10 +6,10 @@ use crate::state::Mode;
 
 pub fn match_keycode(mode: &Mode, input: KeyCode) -> InputResult {
     match input {
-        KeyCode::Char(c) if mode != &Mode::Basic => {
+        KeyCode::Char(c) if matches!(mode, &Mode::Search(_)) => {
             InputResult::ModifyMode(ModifyMode::PushChar(c))
         }
-        KeyCode::Backspace if mode != &Mode::Basic => InputResult::ModifyMode(ModifyMode::PopChar),
+        KeyCode::Backspace if matches!(mode, &Mode::Search(_)) => InputResult::ModifyMode(ModifyMode::PopChar),
         KeyCode::Up | KeyCode::Char('k') => InputResult::MoveUp,
         KeyCode::Down | KeyCode::Char('j') => InputResult::MoveDown,
         KeyCode::Left | KeyCode::Char('h') => InputResult::GoBack,
@@ -17,7 +17,8 @@ pub fn match_keycode(mode: &Mode, input: KeyCode) -> InputResult {
         KeyCode::Char('/') => {
             InputResult::ModeChange(Mode::Search(Rc::new(RefCell::new(String::new()))))
         }
-        KeyCode::Esc if matches!(mode, &Mode::Search(_)) => InputResult::ModeChange(Mode::Basic),
+        KeyCode::Esc | KeyCode::Enter if matches!(mode, &Mode::Search(_)) => InputResult::ModeChange(Mode::EscapedSearch),
+        KeyCode::Esc if matches!(mode, &Mode::EscapedSearch) => InputResult::ModeChange(Mode::Basic),
         KeyCode::Char('q') => InputResult::Quit,
         _ => InputResult::Skip,
     }

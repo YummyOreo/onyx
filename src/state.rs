@@ -16,6 +16,7 @@ type GetScoreFn = dyn Fn(&str, &File) -> Option<(i64, Vec<usize>)>;
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mode {
     Basic,
+    EscapedSearch,
     Search(Rc<RefCell<String>>),
 }
 
@@ -143,6 +144,7 @@ impl State {
                 self.files.input = Default::default();
                 self.files.sort_mode = SortMode::Default;
             }
+            Mode::EscapedSearch => {},
             Mode::Search(s) => {
                 self.files.sort_mode = search_mode;
                 self.files.input = s.clone();
