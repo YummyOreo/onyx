@@ -6,10 +6,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use eyre::Report;
+use eyre::{Report, Result};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
-use crate::filesystem::read::File;
+use crate::filesystem::{
+    read::File,
+    write::{create_file, delete_file, rename_file},
+};
 
 type GetScoreFn = dyn Fn(&str, &File) -> Option<(i64, Vec<usize>)>;
 
@@ -157,5 +160,46 @@ impl State {
                 self.files.input = s.clone();
             }
         }
+    }
+
+    pub fn execute(&mut self) -> Result<()> {
+        match &self.mode {
+            Mode::Command(_) => self.execute_command(),
+            _ => Ok(()),
+        }
+    }
+
+    fn execute_command(&mut self) -> Result<()> {
+        if let Mode::Command(s) = &self.mode {
+            let s = s.borrow().to_string();
+            let mut split = s.split(' ');
+            let (command, option) = (split.next().unwrap(), split.last().unwrap_or_default());
+            match command {
+                "c" | "create" | "m" | "make" | "touch" => create_file(&self.path, option)?,
+                "d" | "delete" => delete_file(
+                    &self.path,
+                    self.files
+                        .files
+                        .get(self.selected)
+                        .unwrap()
+                        .name
+                        .to_str()
+                        .unwrap(),
+                )?,
+                "r" | "ren" | "rename" => rename_file(
+                    &self.path,
+                    self.files
+                        .files
+                        .get(self.selected)
+                        .unwrap()
+                        .name
+                        .to_str()
+                        .unwrap(),
+                    option,
+                )?,
+                _ => {}
+            };
+        }
+        Ok(())
     }
 }

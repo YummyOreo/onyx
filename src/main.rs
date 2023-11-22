@@ -114,6 +114,7 @@ impl App {
             InputResult::ModifyMode(ModifyMode::PushChar(c)) => state.mode.push(c),
             InputResult::ModeChange(m) => state.change_mode(m),
             InputResult::ExecuteMode if matches!(state.mode, state::Mode::Command(_)) => {
+                state.execute().unwrap();
                 state.change_mode(state::Mode::Basic);
             }
             _ => {}
