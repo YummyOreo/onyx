@@ -1,18 +1,27 @@
 use std::{
+    borrow::BorrowMut,
+    cell::RefCell,
     path::PathBuf,
+    rc::Rc,
     time::{Duration, Instant},
 };
 
-use eyre::Report;
+use eyre::{Report, Result};
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
-use crate::filesystem::read::File;
+use crate::filesystem::{
+    read::File,
+    write::{create_file, delete_file, rename_file},
+};
 
-#[derive(PartialEq, Eq)]
+type GetScoreFn = dyn Fn(&str, &File) -> Option<(i64, Vec<usize>)>;
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mode {
     Basic,
-    CreateFile(String),
-    RenameFile(PathBuf, String),
-    DeleteFile(PathBuf, String),
+    EscapedSearch,
+    Search(Rc<RefCell<String>>),
+    Command(Rc<RefCell<String>>),
 }
 
 impl Default for Mode {
@@ -22,24 +31,32 @@ impl Default for Mode {
 }
 
 impl Mode {
-    pub fn add_char(&mut self, c: char) {
-        match self {
-            Self::CreateFile(s) | Self::RenameFile(_, s) | Mode::DeleteFile(_, s) => s.push(c),
-            _ => {}
+    pub fn get(&self) -> Option<String> {
+        match &self {
+            Self::Search(s) => Some(s.borrow().clone()),
+            _ => None,
         }
     }
-    pub fn remove_char(&mut self) {
+    pub fn push(&mut self, c: char) {
         match self {
-            Self::CreateFile(s) | Self::RenameFile(_, s) | Mode::DeleteFile(_, s) => {
-                s.pop();
+            Self::Search(s) | Self::Command(s) => {
+                s.borrow_mut().replace_with(|s| {
+                    s.push(c);
+                    s.to_string()
+                });
             }
             _ => {}
         }
     }
-    pub fn get_str(&self) -> Option<&str> {
+    pub fn pop(&mut self) {
         match self {
-            Self::CreateFile(s) | Self::RenameFile(_, s) | Mode::DeleteFile(_, s) => Some(s),
-            _ => None,
+            Self::Search(s) | Self::Command(s) => {
+                s.borrow_mut().replace_with(|s| {
+                    s.pop();
+                    s.to_string()
+                });
+            }
+            _ => {}
         }
     }
 }
@@ -63,18 +80,126 @@ impl Info {
     }
 }
 
+pub enum SortMode {
+    Default,
+    Fuzzy,
+}
+
+impl Default for SortMode {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl SortMode {
+    pub fn get_score_fn(&self) -> Option<Box<GetScoreFn>> {
+        match self {
+            Self::Default => None,
+            Self::Fuzzy => {
+                let matcher = SkimMatcherV2::default();
+                Some(Box::new(move |pattern, file| {
+                    matcher.fuzzy_indices(&file.name.to_string_lossy(), pattern)
+                }))
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Files {
+    pub files: Vec<File>,
+    pub sort_mode: SortMode,
+    pub input: Rc<RefCell<String>>,
+}
+
+impl Files {
+    pub fn new(files: Vec<File>) -> Self {
+        Self {
+            files,
+            ..Default::default()
+        }
+    }
+    pub fn sort(&mut self) -> Option<()> {
+        let f = self.sort_mode.get_score_fn()?;
+        self.files.sort_by(|a, b| {
+            f(&self.input.borrow(), a)
+                .unwrap_or_default()
+                .0
+                .cmp(&f(&self.input.borrow(), b).unwrap_or_default().0)
+        });
+        self.files.reverse();
+        Some(())
+    }
+}
+
 #[derive(Default)]
 pub struct State {
     pub path: PathBuf,
     pub last_path: PathBuf,
-    pub files: Vec<File>,
+    pub files: Files,
     pub selected: usize,
-    pub mode: Mode,
     pub info: Vec<Info>,
+    pub mode: Mode,
 }
 
 impl State {
     pub async fn purge_info(infos: &mut Vec<Info>, d: Duration) {
         infos.retain(|i| i.time.elapsed() < d);
+    }
+
+    pub fn change_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        match &self.mode {
+            Mode::Basic => {
+                self.files.input = Default::default();
+                self.files.sort_mode = SortMode::Default;
+            }
+            Mode::EscapedSearch | Mode::Command(_) => {}
+            Mode::Search(s) => {
+                self.files.sort_mode = SortMode::Fuzzy;
+                self.files.input = s.clone();
+            }
+        }
+    }
+
+    pub fn execute(&mut self) -> Result<()> {
+        match &self.mode {
+            Mode::Command(_) => self.execute_command(),
+            _ => Ok(()),
+        }
+    }
+
+    fn execute_command(&mut self) -> Result<()> {
+        if let Mode::Command(s) = &self.mode {
+            let s = s.borrow().to_string();
+            let mut split = s.split(' ');
+            let (command, option) = (split.next().unwrap(), split.last().unwrap_or_default());
+            match command {
+                "c" | "create" | "m" | "make" | "touch" => create_file(&self.path, option)?,
+                "d" | "delete" => delete_file(
+                    &self.path,
+                    self.files
+                        .files
+                        .get(self.selected)
+                        .unwrap()
+                        .name
+                        .to_str()
+                        .unwrap(),
+                )?,
+                "r" | "ren" | "rename" => rename_file(
+                    &self.path,
+                    self.files
+                        .files
+                        .get(self.selected)
+                        .unwrap()
+                        .name
+                        .to_str()
+                        .unwrap(),
+                    option,
+                )?,
+                _ => {}
+            };
+        }
+        Ok(())
     }
 }
