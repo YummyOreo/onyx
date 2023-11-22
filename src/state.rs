@@ -18,6 +18,7 @@ pub enum Mode {
     Basic,
     EscapedSearch,
     Search(Rc<RefCell<String>>),
+    Command(Rc<RefCell<String>>),
 }
 
 impl Default for Mode {
@@ -34,19 +35,25 @@ impl Mode {
         }
     }
     pub fn push(&mut self, c: char) {
-        if let Self::Search(s) = self {
-            s.borrow_mut().replace_with(|s| {
-                s.push(c);
-                s.to_string()
-            });
+        match self {
+            Self::Search(s) | Self::Command(s) => {
+                s.borrow_mut().replace_with(|s| {
+                    s.push(c);
+                    s.to_string()
+                });
+            }
+            _ => {}
         }
     }
     pub fn pop(&mut self) {
-        if let Self::Search(s) = self {
-            s.borrow_mut().replace_with(|s| {
-                s.pop();
-                s.to_string()
-            });
+        match self {
+            Self::Search(s) | Self::Command(s) => {
+                s.borrow_mut().replace_with(|s| {
+                    s.pop();
+                    s.to_string()
+                });
+            }
+            _ => {}
         }
     }
 }
@@ -137,16 +144,16 @@ impl State {
         infos.retain(|i| i.time.elapsed() < d);
     }
 
-    pub fn change_sort_mode(&mut self, mode: Mode, search_mode: SortMode) {
+    pub fn change_mode(&mut self, mode: Mode) {
         self.mode = mode;
         match &self.mode {
             Mode::Basic => {
                 self.files.input = Default::default();
                 self.files.sort_mode = SortMode::Default;
             }
-            Mode::EscapedSearch => {}
+            Mode::EscapedSearch | Mode::Command(_) => {}
             Mode::Search(s) => {
-                self.files.sort_mode = search_mode;
+                self.files.sort_mode = SortMode::Fuzzy;
                 self.files.input = s.clone();
             }
         }

@@ -112,7 +112,10 @@ impl App {
             }
             InputResult::ModifyMode(ModifyMode::PopChar) => state.mode.pop(),
             InputResult::ModifyMode(ModifyMode::PushChar(c)) => state.mode.push(c),
-            InputResult::ModeChange(m) => state.change_sort_mode(m, SortMode::Fuzzy),
+            InputResult::ModeChange(m) => state.change_mode(m),
+            InputResult::ExecuteMode if matches!(state.mode, state::Mode::Command(_)) => {
+                state.change_mode(state::Mode::Basic);
+            }
             _ => {}
         }
         Ok(false)

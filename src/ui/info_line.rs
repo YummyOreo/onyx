@@ -10,10 +10,18 @@ use ratatui::{
 use super::UI_ERROR_WRAP;
 
 pub fn render_info_line(f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
-    if matches!(state.mode, Mode::Search(_) | Mode::EscapedSearch) {
-        let p = Paragraph::new(state.files.input.borrow().to_string());
-        f.render_widget(p, chunk);
-        return;
+    match &state.mode {
+        Mode::Search(_) | Mode::EscapedSearch => {
+            let p = Paragraph::new("/".to_string() + &state.files.input.borrow().to_string());
+            f.render_widget(p, chunk);
+            return;
+        }
+        Mode::Command(s) => {
+            let p = Paragraph::new(":".to_string() + &s.borrow().to_string());
+            f.render_widget(p, chunk);
+            return;
+        }
+        _ => {}
     }
     if let Some(i) = state.info.last() {
         let p = match &i.kind {
