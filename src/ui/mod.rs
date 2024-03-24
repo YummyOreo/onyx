@@ -1,5 +1,6 @@
-use std::{fs, io};
+use std::io;
 
+use crate::State;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
@@ -9,19 +10,13 @@ use eyre::{eyre, Context, ContextCompat, Result};
 use ratatui::{
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout, Rect},
     style::{Color, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
+    widgets::{List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
-use syntect::{
-    easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet, util::LinesWithEndings,
-};
 
-use crate::{state::InfoKind, Mode, State};
-
-use self::utils::convert_sytax_style;
-
+mod info_line;
 pub mod input;
+mod side_panel;
 mod utils;
 
 const UI_ERROR_WRAP: &str = "Error while rendering ui:";
@@ -55,32 +50,26 @@ impl UiState {
             if key_event.kind == KeyEventKind::Release {
                 return input::InputResult::Skip;
             }
-            return input::match_keycode(
-                &state.mode,
-                state.files.get(state.selected).map(|f| f.path.clone()),
-                key_event.code,
-            );
+            return input::match_keycode(&state.mode, key_event.code);
         }
         input::InputResult::Skip
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, impl Backend>, state: &State) {
+        let info_line_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(0)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(f.size());
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .margin(0)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(f.size());
+            .split(info_line_layout[0]);
         let left_layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(0)
-            .constraints(
-                [
-                    Constraint::Length(1),
-                    Constraint::Min(0),
-                    Constraint::Length(1),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Length(1), Constraint::Min(0)].as_ref())
             .split(layout[0]);
 
         self.draw_path(
@@ -91,9 +80,8 @@ impl UiState {
         self.draw_files(f, left_layout[1], state)
             .wrap_err(UI_ERROR_WRAP)
             .unwrap();
-        self.draw_info(f, left_layout[2], state);
-        self.draw_content(f, layout[1], state);
-        self.draw_input(f, state);
+        info_line::render_info_line(f, info_line_layout[1], state);
+        side_panel::draw_side_panel(f, layout[1], state);
     }
 
     fn draw_path(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, path: &str) {
@@ -109,6 +97,7 @@ impl UiState {
     ) -> Result<()> {
         let mut items = state
             .files
+            .files
             .iter()
             .enumerate()
             .map(|(pos, file)| {
@@ -122,9 +111,9 @@ impl UiState {
                 let style = if pos == state.selected {
                     Style::default()
                         .fg(Color::Black)
-                        .bg(self.get_file_color(&file.file_type)?)
+                        .bg(utils::get_file_color(&file.file_type))
                 } else {
-                    Style::default().fg(self.get_file_color(&file.file_type)?)
+                    Style::default().fg(utils::get_file_color(&file.file_type))
                 };
                 Ok(ListItem::new(text).style(style))
             })
@@ -140,131 +129,5 @@ impl UiState {
         self.scroll_state.select(Some(state.selected));
         f.render_stateful_widget(list, chunk, &mut self.scroll_state);
         Ok(())
-    }
-
-    fn get_file_color(&self, kind: &std::fs::FileType) -> Result<Color> {
-        if kind.is_dir() {
-            return Ok(Color::Cyan);
-        }
-        if kind.is_file() {
-            return Ok(Color::White);
-        }
-        if kind.is_symlink() {
-            return Ok(Color::Green);
-        }
-        Err(eyre!("unreachable"))
-    }
-
-    fn draw_input(&self, f: &mut Frame<'_, impl Backend>, state: &State) {
-        if state.mode != Mode::Basic {
-            let title = match &state.mode {
-                Mode::Basic => "",
-                Mode::CreateFile(_) => "Create File",
-                Mode::RenameFile(_, _) => "Renaming file",
-                Mode::DeleteFile(_, _) => "Deleting file",
-            };
-
-            let block = Block::default().title(title).borders(Borders::ALL);
-            let p = Paragraph::new(state.mode.get_str().unwrap_or("")).block(block);
-            let area = utils::centered_rect(60, 3, f.size());
-            f.render_widget(Clear, area); //this clears out the background
-            f.render_widget(p, area);
-        }
-    }
-
-    fn draw_info(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
-        if let Some(i) = state.info.last() {
-            let p = match &i.kind {
-                InfoKind::Error(r) => Paragraph::new(
-                    format!("{r}")
-                        .split('\n')
-                        .peekable()
-                        .next()
-                        .wrap_err(UI_ERROR_WRAP)
-                        .unwrap()
-                        .to_string(),
-                )
-                .style(Style::default().bg(Color::Red)),
-                InfoKind::Message(s) => Paragraph::new(s.to_string()),
-            };
-            f.render_widget(p, chunk)
-        } else {
-            // do something if there is nothing here
-        }
-    }
-    fn draw_content(&mut self, f: &mut Frame<'_, impl Backend>, chunk: Rect, state: &State) {
-        let border = Block::default().borders(Borders::LEFT);
-        let text = match state.files.get(state.selected) {
-            Some(file) if file.is_dir().unwrap() => {
-                let files = fs::read_dir(&file.path).unwrap().enumerate();
-
-                let mut lines: Vec<Line> = vec![];
-                for (i, file) in files {
-                    if i > chunk.height as usize + 1_usize {
-                        break;
-                    }
-                    let file = file.unwrap();
-                    lines.push(Line::from(Span::styled(
-                        file.file_name().to_string_lossy().to_string(),
-                        Style::default()
-                            .fg(self.get_file_color(&file.file_type().unwrap()).unwrap()),
-                    )))
-                }
-                if lines.is_empty() {
-                    lines.push(Line::from(Span::styled(
-                        "Empty",
-                        Style::default().fg(Color::Gray),
-                    )))
-                }
-                lines
-            }
-            Some(file) if file.is_file().unwrap() => {
-                let ps = SyntaxSet::load_defaults_newlines();
-                let ts = ThemeSet::load_defaults();
-                let syntax = ps
-                    .find_syntax_by_extension(
-                        file.path.extension().unwrap_or_default().to_str().unwrap(),
-                    )
-                    .unwrap_or(ps.find_syntax_plain_text());
-
-                let mut h = HighlightLines::new(syntax, &ts.themes["Solarized (dark)"]);
-                let content = String::from_utf8(fs::read(&file.path).unwrap())
-                    .unwrap_or("Binary".to_string());
-                let mut lines: Vec<Line> = vec![];
-
-                for line in LinesWithEndings::from(&content) {
-                    let ranges: Vec<(syntect::highlighting::Style, &str)> =
-                        h.highlight_line(line, &ps).unwrap();
-                    let mut line = vec![];
-                    for (style, s) in ranges {
-                        line.push(Span::styled(s.to_string(), convert_sytax_style(style)));
-                    }
-                    lines.push(Line::from(line));
-                }
-                lines
-            }
-            Some(file) if file.file_type.is_symlink() => {
-                let path = file
-                    .path
-                    .canonicalize()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string();
-                vec![Line::from(Span::styled(
-                    path,
-                    Style::default().fg(Color::LightBlue),
-                ))]
-            }
-            Some(_) => vec![Line::from(Span::styled(
-                "Unknown",
-                Style::default().fg(Color::Gray),
-            ))],
-            None => vec![Line::from(Span::styled(
-                "Empty",
-                Style::default().fg(Color::Gray),
-            ))],
-        };
-        let p = Paragraph::new(text).block(border);
-        f.render_widget(p, chunk)
     }
 }

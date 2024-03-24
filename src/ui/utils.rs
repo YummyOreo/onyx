@@ -26,17 +26,25 @@ pub fn centered_rect(percent_x: u16, size_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
+pub fn get_file_color(kind: &std::fs::FileType) -> Color {
+    if kind.is_dir() {
+        return Color::Cyan;
+    }
+    if kind.is_file() {
+        return Color::White;
+    }
+    if kind.is_symlink() {
+        return Color::Green;
+    }
+    Color::DarkGray
+}
+
 pub fn convert_sytax_style(s_style: syntect::highlighting::Style) -> Style {
     let mut style = Style::default();
     style = style.fg(Color::Rgb(
         s_style.foreground.r,
         s_style.foreground.g,
         s_style.foreground.b,
-    ));
-    style = style.bg(Color::Rgb(
-        s_style.background.r,
-        s_style.background.g,
-        s_style.background.b,
     ));
     style
 }
