@@ -5,9 +5,10 @@ use eyre::Result;
 use filesystem::read::{read_path, read_with_fallback, ReadRes};
 use ratatui::widgets::ListState;
 use settings::parse_args;
-use state::{Info, InfoKind, Mode, State};
+use state::{Files, Info, InfoKind, SortMode, State};
+use ui::input::ModifyMode;
 
-use crate::ui::input::{InputModeResult, InputResult};
+use crate::ui::input::InputResult;
 
 mod filesystem;
 mod settings;
@@ -27,7 +28,7 @@ impl App {
         };
 
         let state = State {
-            files,
+            files: Files::new(files),
             info: Vec::default(),
             path,
             last_path: PathBuf::new(),
@@ -45,23 +46,27 @@ impl App {
         loop {
             let state = &mut self.state;
             if state.last_path != state.path {
-                state.files = match read_with_fallback(&state.path, PathBuf::from("./")).await? {
-                    ReadRes::Read(files) => files,
-                    ReadRes::FallBack { error, files } => {
-                        state.path = PathBuf::from("./");
-                        state.info.push(Info::new(InfoKind::Error(error)));
-                        files
-                    }
-                };
+                state.files.files =
+                    match read_with_fallback(&state.path, PathBuf::from("./")).await? {
+                        ReadRes::Read(files) => files,
+                        ReadRes::FallBack { error, files } => {
+                            state.path = PathBuf::from("./");
+                            state.info.push(Info::new(InfoKind::Error(error)));
+                            files
+                        }
+                    };
                 if !state.path.is_absolute() {
                     state.path = state.path.canonicalize()?;
                 }
                 state.last_path = state.path.clone()
             } else {
-                state.files = read_path(&state.path).await?;
+                state.files.files = read_path(&state.path).await?;
             }
+            state.files.sort();
 
-            state.selected = state.selected.clamp(0, state.files.len().saturating_sub(1));
+            state.selected = state
+                .selected
+                .clamp(0, state.files.files.len().saturating_sub(1));
             terminal.draw(|f| self.ui.draw(f, state))?;
             State::purge_info(&mut state.info, Duration::from_secs(4)).await;
 
@@ -92,10 +97,10 @@ impl App {
                     .selected
                     .checked_add(1)
                     .unwrap()
-                    .clamp(0, state.files.len().saturating_sub(1));
+                    .clamp(0, state.files.files.len().saturating_sub(1));
             }
             InputResult::EnterFolder => {
-                let folder = &state.files[state.selected];
+                let folder = &state.files.files[state.selected];
                 if folder.is_dir()? {
                     state.path = folder.path.clone();
                     state.selected = 0;
@@ -105,36 +110,12 @@ impl App {
                 state.path.pop();
                 state.selected = 0;
             }
-            InputResult::Mode(InputModeResult::ModeChange(m)) => {
-                state.mode = m;
-            }
-            InputResult::Mode(InputModeResult::AddChar(c)) => {
-                state.mode.add_char(c);
-            }
-            InputResult::Mode(InputModeResult::RemoveChar) => {
-                state.mode.remove_char();
-            }
-            InputResult::Mode(InputModeResult::Execute) => {
-                let mut mode = Mode::Basic;
-                core::mem::swap(&mut state.mode, &mut mode);
-                match mode {
-                    Mode::CreateFile(file) => {
-                        if let Err(e) = filesystem::modify::create_file(&file, &state.path).await {
-                            state.info.push(Info::new(InfoKind::Error(e)));
-                        }
-                    }
-                    Mode::RenameFile(from, new) => {
-                        if let Err(e) = filesystem::modify::rename_file(&from, &new).await {
-                            state.info.push(Info::new(InfoKind::Error(e)));
-                        }
-                    }
-                    Mode::DeleteFile(file, confirm) if confirm.to_lowercase() == "y" => {
-                        if let Err(e) = filesystem::modify::delete_file(&file).await {
-                            state.info.push(Info::new(InfoKind::Error(e)));
-                        }
-                    }
-                    _ => {}
-                };
+            InputResult::ModifyMode(ModifyMode::PopChar) => state.mode.pop(),
+            InputResult::ModifyMode(ModifyMode::PushChar(c)) => state.mode.push(c),
+            InputResult::ModeChange(m) => state.change_mode(m),
+            InputResult::ExecuteMode if matches!(state.mode, state::Mode::Command(_)) => {
+                state.execute().unwrap();
+                state.change_mode(state::Mode::Basic);
             }
             _ => {}
         }
